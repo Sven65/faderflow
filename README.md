@@ -28,7 +28,7 @@ A hardware audio mixer with motorized faders, full-color displays, and automatic
 
 ## Software Stack
 
-- **Desktop:** Rust + egui
+- **Desktop:** Rust + iced
 - **Firmware:** Arduino C++
 - **Platform:** Windows (Linux planned)
 
