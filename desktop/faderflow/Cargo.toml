@@ -1,0 +1,12 @@
+[package]
+name = "faderflow"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { version = "0.14.0", features = ["tokio", "image"] }
+iced_modern_theme = "0.1.6"
+palette = "0.7.5"
+serialport = "4.8.1"
+
+windows = { version = "0.62.2", features = ["Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_Foundation", "Win32_System_Variant", "Win32_System_Threading"] }
