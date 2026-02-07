@@ -1252,12 +1252,15 @@ dependencies = [
 name = "faderflow"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "iced 0.14.0",
  "iced_modern_theme",
  "image",
  "palette",
  "serialport",
+ "tokio",
  "windows 0.62.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
