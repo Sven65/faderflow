@@ -80,7 +80,7 @@
 		(aux_axis_origin 100 100)
 		(grid_origin 100 100)
 		(pcbplotparams
-			(layerselection 0x00000000_00000000_00000000_000000a5)
+			(layerselection 0x00000000_00000000_55555555_555555f5)
 			(plot_on_all_layers_selection 0x00000000_00000000_00000000_00000000)
 			(disableapertmacros no)
 			(usegerberextensions no)
@@ -114,9 +114,9 @@
 			(subtractmaskfromsilk no)
 			(outputformat 1)
 			(mirror no)
-			(drillshape 1)
+			(drillshape 0)
 			(scaleselection 1)
-			(outputdirectory "")
+			(outputdirectory "Gerbers/")
 		)
 	)
 	(net 0 "")
@@ -3643,7 +3643,7 @@
 		)
 		(property "Value" "DRV_01_PWR"
 			(at -2.5 1 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "ff0d4432-203e-42b8-a333-aa628fc12394")
 			(effects
 				(font
@@ -4157,7 +4157,7 @@
 		)
 		(property "Value" "CH_01"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "5e95cdaf-886c-4bd3-b1d8-51a86707b692")
 			(effects
 				(font
@@ -4476,7 +4476,7 @@
 		)
 		(property "Value" "DRV_03_PWR"
 			(at -3 0.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "fde0311b-2498-4c2c-9c83-e0c2dc049335")
 			(effects
 				(font
@@ -5095,7 +5095,7 @@
 		)
 		(property "Value" "Main"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "55a3a08e-6a7f-44c1-b938-002b85e3a90b")
 			(effects
 				(font
@@ -5414,7 +5414,7 @@
 		)
 		(property "Value" "CH_04"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "354b7512-949e-465a-a88a-38e0ccad0b49")
 			(effects
 				(font
@@ -5733,7 +5733,7 @@
 		)
 		(property "Value" "DRV_02_PWR"
 			(at -2.5 1 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "a577634d-25b8-4001-828b-51c957dc9eb4")
 			(effects
 				(font
@@ -8153,7 +8153,7 @@
 		)
 		(property "Value" "EXT VCC"
 			(at 0 4.5 0)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "f83e3e4e-1a94-4aa7-a8ab-e8aaf45e3fe5")
 			(effects
 				(font
@@ -8484,7 +8484,7 @@
 		)
 		(property "Value" "DRV_03"
 			(at -2.5 3 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "63c74579-0c5f-4728-b0ec-02b8889faaec")
 			(effects
 				(font
@@ -8759,7 +8759,7 @@
 		)
 		(property "Value" "SCR_SPI"
 			(at 0 14.5 0)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "bee523a9-815b-48c9-ba42-db078970881c")
 			(effects
 				(font
@@ -12872,7 +12872,7 @@
 		)
 		(property "Value" "CH_02"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "874ed7d9-db2c-4369-8aae-190fba2fa86b")
 			(effects
 				(font
@@ -13191,7 +13191,7 @@
 		)
 		(property "Value" "CH_03"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "310b333d-fba2-47d3-ae31-96172a76d3ee")
 			(effects
 				(font
@@ -13510,7 +13510,7 @@
 		)
 		(property "Value" "DRV_01"
 			(at -2.5 3.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "403fe89a-096b-49ad-b7b1-c09e50ad430b")
 			(effects
 				(font
@@ -14742,7 +14742,7 @@
 		)
 		(property "Value" "DRV_02"
 			(at -2.5 2.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "eaa0f835-d2af-4f42-ba4d-087ba7debb11")
 			(effects
 				(font
@@ -15017,7 +15017,7 @@
 		)
 		(property "Value" "CH_05"
 			(at 0 16.5 90)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "8e2865f3-aefd-4518-bb34-7992727723fd")
 			(effects
 				(font
@@ -15414,7 +15414,7 @@
 		)
 		(property "Value" "SD_SPI"
 			(at 0 14.5 180)
-			(layer "F.Fab")
+			(layer "F.SilkS")
 			(uuid "0be391fe-d76c-41db-9181-c796656c7c56")
 			(effects
 				(font

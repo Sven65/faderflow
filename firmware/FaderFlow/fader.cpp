@@ -51,7 +51,7 @@ void readFaders() {
         }
 
         // Map to 0-255
-        uint8_t faderPos = map(state->lastRawValue, 0, 1023, 0, 255);
+        uint8_t faderPos = map(state->lastRawValue, 0, 1024, 0, 255);
 
         // Only send if changed beyond deadband
         if (abs(faderPos - state->lastSentValue) > FADER_DEADBAND) {
