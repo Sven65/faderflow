@@ -25,3 +25,7 @@ target
 
 Gerbers.zip
 *.kicad_sch-bak
+pcb/**/*-backups
+*.kicad_pcb.lck
+*.kicad_sch.lck
+*
