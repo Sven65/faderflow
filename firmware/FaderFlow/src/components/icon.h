@@ -11,7 +11,7 @@
 #define ICON_SIZE 64
 
 class Icon {
-public:
+  public:
     Icon();
 
     // Start receiving a new icon
@@ -26,21 +26,24 @@ public:
     // Draw the icon at the specified position
     void draw(Adafruit_GFX* display, int16_t x, int16_t y);
 
-    // Get the icon buffer (for SD card operations)
-    uint16_t* getBuffer();
+    // Use the test icon from PROGMEM
+    void useTestIcon();
 
     // Get buffer size in bytes
-    size_t getBufferSize();
+    static size_t getBufferSize();
 
     // Clear the icon
     void clear();
 
-private:
-    uint16_t buffer[ICON_SIZE * ICON_SIZE];
+  private:
     bool ready;
+    bool usingTestIcon;
     uint8_t highByte;
     bool expectingLowByte;
     int pixelIndex;
+
+    // Small line buffer for drawing from PROGMEM
+    static uint16_t lineBuffer[ICON_SIZE];
 };
 
 #endif //FADERFLOW_ICON_H

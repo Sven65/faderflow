@@ -14,10 +14,20 @@ fn main() -> iced::Result {
 mod comms;
 
 use serialport::{self, SerialPort};
-use std::io::{Read, Write};
+use std::io::{Read, Write, BufRead};
 use std::time::Duration;
+use std::thread;
+use std::sync::{Arc, Mutex};
 use comms::protocol;
-use crate::comms::protocol::{FaderMessage, HandshakeResponse, CMD_FADER_UPDATE, CMD_HANDSHAKE_REQUEST};
+use crate::comms::protocol::{
+    FaderMessage, HandshakeResponse,
+    CMD_FADER_UPDATE, CMD_HANDSHAKE_REQUEST,
+    DisplayUpdateAppCommand, DisplayUpdateVolumeCommand,
+    CMD_DISPLAY_UPDATE_APP_NAME, CMD_DISPLAY_UPDATE_APP_VOLUME
+};
+
+pub const INIT_WAIT_TIME_MS: u64 = 100;
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Scanning for FaderFlow devices...\n");
@@ -30,13 +40,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Checking port: {}", port_info.port_name);
 
         match serialport::new(&port_info.port_name, 115200)
-            .timeout(Duration::from_millis(1000))  // Longer timeout
+            .timeout(Duration::from_millis(INIT_WAIT_TIME_MS))
+            .flow_control(serialport::FlowControl::None)
             .open()
         {
             Ok(mut port) => {
                 println!("  Port opened successfully");
 
-                // Wait longer for Arduino to reset after serial connection
+                // Wait for Arduino to reset after serial connection
                 std::thread::sleep(Duration::from_millis(2000));
 
                 // Clear buffer
@@ -84,15 +95,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let mut port = device_port.ok_or("No FaderFlow device found")?;
+    let port = device_port.ok_or("No FaderFlow device found")?;
 
+    println!("Commands:");
+    println!("  app:<channel>:<name>  - Set app name (e.g., 'app:0:Spotify')");
+    println!("  vol:<channel>:<0-100> - Set volume (e.g., 'vol:0:75')");
     println!("Listening for fader updates... (Ctrl+C to exit)\n");
 
-    // Listen for fader messages
+    // Wrap port in Arc<Mutex> so we can share it between threads
+    let port = Arc::new(Mutex::new(port));
+    let port_clone = Arc::clone(&port);
+
+    // Spawn thread for reading console input
+    thread::spawn(move || {
+        let stdin = std::io::stdin();
+        for line in stdin.lock().lines() {
+            if let Ok(cmd) = line {
+                let parts: Vec<&str> = cmd.trim().split(':').collect();
+
+                if parts.len() >= 3 && parts[0] == "app" {
+                    // Parse: app:0:Spotify
+                    if let Ok(channel) = parts[1].parse::<u8>() {
+                        let app_name = parts[2..].join(":"); // Handle colons in app name
+
+                        if let Ok(mut port) = port_clone.lock() {
+                            send_app_name(&mut **port, channel, &app_name).ok();
+                        }
+                    }
+                } else if parts.len() == 3 && parts[0] == "vol" {
+                    // Parse: vol:0:75
+                    if let Ok(channel) = parts[1].parse::<u8>() {
+                        if let Ok(volume) = parts[2].parse::<u8>() {
+                            if let Ok(mut port) = port_clone.lock() {
+                                send_volume(&mut **port, channel, volume).ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Listen for fader messages (main thread)
     loop {
         let mut buf = [0u8; std::mem::size_of::<FaderMessage>()];
 
-        match port.read_exact(&mut buf) {
+        let result = {
+            let mut port = port.lock().unwrap();
+            port.read_exact(&mut buf)
+        };
+
+        match result {
             Ok(_) => {
                 let msg: FaderMessage = unsafe {
                     std::ptr::read(buf.as_ptr() as *const _)
@@ -117,5 +170,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    Ok(())
+}
+
+fn send_app_name(port: &mut dyn SerialPort, channel: u8, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = DisplayUpdateAppCommand {
+        cmd: CMD_DISPLAY_UPDATE_APP_NAME,
+        channel,
+        name: [0; 64],
+    };
+
+    let bytes = name.as_bytes();
+    let len = bytes.len().min(63);
+    cmd.name[..len].copy_from_slice(&bytes[..len]);
+
+    let bytes = unsafe {
+        std::slice::from_raw_parts(&cmd as *const _ as *const u8, std::mem::size_of::<DisplayUpdateAppCommand>())
+    };
+
+    println!("Sending {} bytes: {:?}", bytes.len(), &bytes[..10]); // Print first 10 bytes
+    port.write_all(bytes)?;
+    port.flush()?;
+
+    println!("Sent app name '{}' to channel {}", name, channel);
+    Ok(())
+}
+
+fn send_volume(port: &mut dyn SerialPort, channel: u8, volume: u8) -> Result<(), Box<dyn std::error::Error>> {
+    let cmd = DisplayUpdateVolumeCommand {
+        cmd: CMD_DISPLAY_UPDATE_APP_VOLUME,
+        channel,
+        volume: volume.min(100),
+    };
+
+    let bytes = unsafe {
+        std::slice::from_raw_parts(&cmd as *const _ as *const u8, std::mem::size_of::<DisplayUpdateVolumeCommand>())
+    };
+    port.write_all(bytes)?;
+    port.flush()?;
+
+    println!("Sent volume {} to channel {}", volume, channel);
     Ok(())
 }

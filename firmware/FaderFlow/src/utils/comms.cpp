@@ -3,7 +3,7 @@
 //
 
 #include "comms.h"
-#include "protocol.h"
+#include "../protocol.h"
 #include "device_id.h"
 #include <string.h>
 

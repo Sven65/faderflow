@@ -1,5 +1,5 @@
 #include "fader.h"
-#include "protocol.h"
+#include "../protocol.h"
 
 const uint8_t faderPins[NUM_FADERS] = {
     FADER_1_PIN,
