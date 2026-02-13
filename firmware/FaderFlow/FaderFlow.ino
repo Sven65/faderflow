@@ -7,7 +7,6 @@
 
 // Create ONE channel for testing
 Channel testChannel(0, 3, 2, 8, 1, 1, 1);
-
 static bool handshakeComplete = false;
 
 void setup() {
@@ -24,17 +23,30 @@ void setup() {
     testChannel.getIcon()->useTestIcon();
     testChannel.setApp("Test App");
     testChannel.updateIconDisplay();
-
+    
     delay(1000);
 }
 
 void loop() {
+    static unsigned long lastBeacon = 0;
+    
+    // Auto-announce until handshake complete
+    if (!handshakeComplete) {
+        if (millis() - lastBeacon > 500) {
+            sendHandshake();
+            lastBeacon = millis();
+        }
+    }
+    
     if (Serial.available() > 0) {
         uint8_t cmd = Serial.read();
         
         if (cmd == CMD_HANDSHAKE_REQUEST || cmd == 'h') {
             sendHandshake();
             handshakeComplete = true;
+        }
+        else if (cmd == CMD_HANDSHAKE_ACK) {
+            handshakeComplete = true;  // Stop beaconing
         }
         else if (cmd == CMD_ECHO_UUID || cmd == 'u') {
             uint8_t uuid[UUID_SIZE];
@@ -71,14 +83,11 @@ void handleAppNameUpdate() {
 
 void handleVolumeUpdate() {
     DisplayUpdateVolumeCommand cmd;
-
-    // Wait for channel and volume with timeout
-    unsigned long startTime = millis();
-    while (Serial.available() < 2) {
-        if (millis() - startTime > 100) return;
+    size_t bytesToRead = sizeof(DisplayUpdateVolumeCommand) - 1;
+    
+    if (Serial.readBytes((uint8_t*)&cmd.channel, bytesToRead) != bytesToRead) {
+        return;
     }
-    cmd.channel = Serial.read();
-    cmd.volume = Serial.read();
     
     testChannel.setVolume(cmd.volume);
 }

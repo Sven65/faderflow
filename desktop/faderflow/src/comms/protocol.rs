@@ -1,11 +1,13 @@
 // protocol.rs - Shared protocol definitions matching Arduino protocol.h
 
 pub const CMD_HANDSHAKE_REQUEST: u8 = 0x01;
-pub const CMD_ECHO_UUID: u8 = 0x02;
+pub const CMD_HANDSHAKE_ACK: u8 = 0x02;
+pub const CMD_HANDSHAKE_RESPONSE: u8 = 0x03;
+pub const CMD_ECHO_UUID: u8 = 0x04;
 
-pub const  CMD_DISPLAY_UPDATE_APP_NAME: u8 = 0x03;
-pub const  CMD_DISPLAY_UPDATE_APP_VOLUME: u8 = 0x04;
-pub const  CMD_DISPLAY_UPDATE_ICON: u8 = 0x05;
+pub const  CMD_DISPLAY_UPDATE_APP_NAME: u8 = 0x05;
+pub const  CMD_DISPLAY_UPDATE_APP_VOLUME: u8 = 0x06;
+pub const  CMD_DISPLAY_UPDATE_ICON: u8 = 0x07;
 
 pub const CMD_FADER_UPDATE: u8 = 0x10;
 
@@ -15,6 +17,7 @@ pub const UUID_SIZE: usize = 16;
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct HandshakeResponse {
+    pub cmd: u8,
     pub magic: [u8; 10],
     pub device_type: u8,
     pub uuid: [u8; UUID_SIZE],

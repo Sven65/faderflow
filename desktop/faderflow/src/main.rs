@@ -1,16 +1,3 @@
-/**mod audio;
-mod ui;
-mod utils;
-
-use ui::app::VolumeApp;
-
-fn main() -> iced::Result {
-    iced::application(VolumeApp::new, VolumeApp::update, VolumeApp::view)
-        .subscription(VolumeApp::subscription)
-        .run()
-}
-**/
-
 mod comms;
 
 use serialport::{self, SerialPort};
@@ -21,13 +8,12 @@ use std::sync::{Arc, Mutex};
 use comms::protocol;
 use crate::comms::protocol::{
     FaderMessage, HandshakeResponse,
-    CMD_FADER_UPDATE, CMD_HANDSHAKE_REQUEST,
+    CMD_FADER_UPDATE, CMD_HANDSHAKE_REQUEST, CMD_HANDSHAKE_ACK, CMD_HANDSHAKE_RESPONSE,
     DisplayUpdateAppCommand, DisplayUpdateVolumeCommand,
     CMD_DISPLAY_UPDATE_APP_NAME, CMD_DISPLAY_UPDATE_APP_VOLUME
 };
 
 pub const INIT_WAIT_TIME_MS: u64 = 100;
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Scanning for FaderFlow devices...\n");
@@ -40,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Checking port: {}", port_info.port_name);
 
         match serialport::new(&port_info.port_name, 115200)
-            .timeout(Duration::from_millis(INIT_WAIT_TIME_MS))
+            .timeout(Duration::from_millis(10))
             .flow_control(serialport::FlowControl::None)
             .open()
         {
@@ -48,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("  Port opened successfully");
 
                 // Wait for Arduino to reset after serial connection
-                std::thread::sleep(Duration::from_millis(2000));
+                std::thread::sleep(Duration::from_millis(3000));
 
                 // Clear buffer
                 let mut discard = [0u8; 256];
@@ -57,36 +43,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(_) => println!("  Buffer was empty"),
                 }
 
-                // Send handshake request
-                println!("  Sending handshake request...");
-                port.write_all(&[CMD_HANDSHAKE_REQUEST])?;
-                port.flush()?;
-                std::thread::sleep(Duration::from_millis(500));
+                println!("  Waiting for device announcement...");
 
-                // Read response
-                let mut buf = [0u8; std::mem::size_of::<HandshakeResponse>()];
-                println!("  Waiting for {} bytes...", buf.len());
+                let start = std::time::Instant::now();
+                let mut found = false;
+                let mut byte_count = 0;
 
-                match port.read_exact(&mut buf) {
-                    Ok(_) => {
-                        println!("  Received response, parsing...");
-                        let response: HandshakeResponse = unsafe {
-                            std::ptr::read(buf.as_ptr() as *const _)
-                        };
+                while start.elapsed() < Duration::from_secs(5) {
+                    let mut buf = [0u8; 1];
+                    match port.read(&mut buf) {
+                        Ok(_) => {
+                            byte_count += 1;
+                            println!("    Byte {}: {} (0x{:02X}) - Looking for CMD_HANDSHAKE_RESPONSE (0x{:02X})",
+                                     byte_count, buf[0], buf[0], CMD_HANDSHAKE_RESPONSE);
 
-                        println!("  Magic: {:?}", &response.magic[..9]);
+                            if buf[0] == CMD_HANDSHAKE_RESPONSE {
+                                println!("    ✓ Found handshake response!");
 
-                        if response.is_valid() {
-                            println!("✓ Found FaderFlow device!\n");
-                            device_port = Some(port);
-                            break;
-                        } else {
-                            println!("  Invalid magic string\n");
+                                // Read rest of handshake
+                                let mut response_buf = [0u8; std::mem::size_of::<HandshakeResponse>()];
+                                response_buf[0] = buf[0];
+
+                                println!("    Reading remaining {} bytes...", response_buf.len() - 1);
+
+                                match port.read_exact(&mut response_buf[1..]) {
+                                    Ok(_) => {
+                                        let response: HandshakeResponse = unsafe {
+                                            std::ptr::read(response_buf.as_ptr() as *const _)
+                                        };
+
+                                        println!("    Magic: {:?}", &response.magic[..9]);
+
+                                        if response.is_valid() {
+                                            println!("✓ Found FaderFlow device!\n");
+
+                                            // Acknowledge to stop beaconing
+                                            port.write_all(&[CMD_HANDSHAKE_ACK])?;
+                                            port.flush()?;
+
+                                            device_port = Some(port);
+                                            found = true;
+                                            break;
+                                        } else {
+                                            println!("    Invalid magic!");
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("    Failed to read rest of handshake: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                            // Timeout is normal, just continue
+                        }
+                        Err(e) => {
+                            println!("    Read error: {}", e);
                         }
                     }
-                    Err(e) => {
-                        println!("  Failed to read response: {}\n", e);
-                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+
+                if found {
+                    break;
+                }
+
+                if byte_count == 0 {
+                    println!("  Received 0 bytes - device not responding\n");
+                } else {
+                    println!("  Received {} total bytes, none were handshake response\n", byte_count);
                 }
             }
             Err(e) => {
@@ -188,7 +213,6 @@ fn send_app_name(port: &mut dyn SerialPort, channel: u8, name: &str) -> Result<(
         std::slice::from_raw_parts(&cmd as *const _ as *const u8, std::mem::size_of::<DisplayUpdateAppCommand>())
     };
 
-    println!("Sending {} bytes: {:?}", bytes.len(), &bytes[..10]); // Print first 10 bytes
     port.write_all(bytes)?;
     port.flush()?;
 

@@ -9,6 +9,7 @@
 
 void sendHandshake() {
     HandshakeResponse response;
+    response.cmd = CMD_HANDSHAKE_RESPONSE;  // ADD THIS LINE!
     strcpy(response.magic, MAGIC_STRING);
     response.device_type = 0x01;
     getDeviceUUID(response.uuid);
