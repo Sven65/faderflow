@@ -1,10 +1,16 @@
 mod comms;
+mod ui;
+mod audio;
+mod utils;
 
 use serialport::{self, SerialPort};
 use std::io::{Read, Write, BufRead};
+use ui::resources::load_icon;
 use std::time::Duration;
 use std::thread;
 use std::sync::{Arc, Mutex};
+use iced::application::TitleFn;
+use iced::Settings;
 use comms::protocol;
 use crate::comms::protocol::{
     FaderMessage, HandshakeResponse,
@@ -15,6 +21,21 @@ use crate::comms::protocol::{
 
 pub const INIT_WAIT_TIME_MS: u64 = 100;
 
+use ui::app::VolumeApp;
+
+fn main() -> iced::Result {
+    iced::application(VolumeApp::new, VolumeApp::update, VolumeApp::view)
+        .subscription(VolumeApp::subscription)
+        .title("FaderFlow")
+        .window(iced::window::Settings {
+            icon: Some(load_icon()),
+            ..Default::default()
+        })
+        .run()
+}
+
+
+/*
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Scanning for FaderFlow devices...\n");
 
@@ -235,4 +256,4 @@ fn send_volume(port: &mut dyn SerialPort, channel: u8, volume: u8) -> Result<(),
 
     println!("Sent volume {} to channel {}", volume, channel);
     Ok(())
-}
+}*/

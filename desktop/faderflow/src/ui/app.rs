@@ -6,10 +6,20 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub struct VolumeApp {
     sessions: HashMap<String, AudioSession>,
     receiver: mpsc::Receiver<AudioUpdate>,
     backend: Box<dyn AudioBackend>,
+    current_view: View,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum View {
+    Sessions,
+    Settings,
+    About,
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +29,9 @@ pub enum Message {
     RefreshSessions,
     SessionsUpdated(Vec<AudioSession>),
     PollReceiver,
+    ShowSessions,
+    ShowSettings,
+    ShowAbout,
 }
 
 impl VolumeApp {
@@ -34,6 +47,7 @@ impl VolumeApp {
                 sessions: HashMap::new(),
                 receiver,
                 backend,
+                current_view: View::Sessions,
             },
             Task::done(Message::RefreshSessions),
         )
@@ -66,7 +80,7 @@ impl VolumeApp {
                 }
             }
             Message::SessionsUpdated(sessions) => {
-                for session in &sessions {  // Add & here
+                for session in &sessions {
                     if let Some(existing) = self.sessions.get_mut(&session.id) {
                         let should_update = existing
                             .last_local_change
@@ -83,10 +97,10 @@ impl VolumeApp {
                         }
 
                         if existing.icon_handle.is_none() && session.icon_handle.is_some() {
-                            existing.icon_handle = session.icon_handle.clone();  // Also add .clone() here
+                            existing.icon_handle = session.icon_handle.clone();
                         }
                     } else {
-                        self.sessions.insert(session.id.clone(), session.clone());  // Add .clone() here too
+                        self.sessions.insert(session.id.clone(), session.clone());
                     }
                 }
 
@@ -143,11 +157,90 @@ impl VolumeApp {
 
                 Task::none()
             }
+            Message::ShowSessions => {
+                self.current_view = View::Sessions;
+                Task::none()
+            }
+            Message::ShowSettings => {
+                self.current_view = View::Settings;
+                Task::none()
+            }
+            Message::ShowAbout => {
+                self.current_view = View::About;
+                Task::none()
+            }
         }
     }
 
     pub fn view(&self) -> Element<Message> {
-        let mut content: Column<Message> = column![].spacing(20).padding(20);
+        // Sidebar
+        let sidebar = container(
+            column![
+                self.sidebar_button("🎵 Sessions", View::Sessions),
+                self.sidebar_button("⚙️ Settings", View::Settings),
+                self.sidebar_button("ℹ️ About", View::About),
+            ]
+                .spacing(10)
+                .padding(20)
+        )
+            .width(200)
+            .height(iced::Length::Fill)
+            .style(|theme: &iced::Theme| {
+                container::Style {
+                    background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.15))),
+                    ..Default::default()
+                }
+            });
+
+        // Main content based on current view
+        let main_content = container(
+            match self.current_view {
+                View::Sessions => self.sessions_view(),
+                View::Settings => self.settings_view(),
+                View::About => self.about_view(),
+            }
+        )
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .padding(20);
+
+        // Combine sidebar and content
+        row![sidebar, main_content].into()
+    }
+
+    // Helper to create sidebar buttons with active state
+    fn sidebar_button<'a>(&'a self, label: &'a str, view: View) -> Element<'a, Message> {
+        let is_active = self.current_view == view;
+
+        let btn = button(text(label))
+            .width(iced::Length::Fill)
+            .padding(10);
+
+        let btn = if is_active {
+            btn.style(|theme: &iced::Theme, status| {
+                button::Style {
+                    background: Some(iced::Background::Color(iced::Color::from_rgb(0.3, 0.3, 0.3))),
+                    text_color: iced::Color::WHITE,
+                    ..button::primary(theme, status)
+                }
+            })
+        } else {
+            btn
+        };
+
+        match view {
+            View::Sessions => btn.on_press(Message::ShowSessions).into(),
+            View::Settings => btn.on_press(Message::ShowSettings).into(),
+            View::About => btn.on_press(Message::ShowAbout).into(),
+        }
+    }
+
+    // Sessions view (your original content)
+    fn sessions_view<'a>(&'a self) -> Element<'a, Message> {
+        let mut content: Column<Message> = column![
+            text("Audio Sessions").size(24)
+        ]
+            .spacing(20);
 
         if self.sessions.is_empty() {
             content = content.push(text("No audio sessions found. Play some audio..."));
@@ -187,10 +280,48 @@ impl VolumeApp {
                 .spacing(10)
                 .align_y(iced::Alignment::Center);
 
-            content = content.push(column![header, volume_control].spacing(5));
+            content = content.push(
+                container(
+                    column![header, volume_control].spacing(5)
+                )
+                    .padding(10)
+                    .style(|theme: &iced::Theme| {
+                        container::Style {
+                            background: Some(iced::Background::Color(iced::Color::from_rgb(0.1, 0.1, 0.1))),
+                            border: iced::Border {
+                                radius: 5.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    })
+            );
         }
 
-        container(content).into()
+        column![content].into()
+    }
+
+    // Settings view
+    fn settings_view<'a>(&'a self) -> Element<'a, Message> {
+        column![
+            text("Settings").size(24),
+            text("Settings options will go here...").size(16),
+        ]
+            .spacing(20)
+            .into()
+    }
+
+    // About view
+    fn about_view<'a>(&'a self) -> Element<'a, Message> {
+        column![
+            text("About FaderFlow").size(24),
+            text(format!("Version {}", VERSION)).size(16),
+            text("A motorized volume controller with individual displays").size(14),
+            text("").size(10),
+            text("Created by Mackan").size(14),
+        ]
+            .spacing(10)
+            .into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
