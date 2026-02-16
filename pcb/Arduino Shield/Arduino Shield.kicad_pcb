@@ -6217,7 +6217,7 @@
 			(at 7 -1 0)
 			(layer "F.SilkS")
 			(hide yes)
-			(uuid "3b28550b-2a7a-4c82-a72e-da883dbb930c")
+			(uuid "5d50439f-cfbe-461a-bfdb-7f98d844b240")
 			(effects
 				(font
 					(size 1.5 1.5)
@@ -6229,7 +6229,7 @@
 			(at 0.75 0 0)
 			(layer "F.SilkS")
 			(hide yes)
-			(uuid "1efcd5d5-3445-41ee-abeb-161eefb13daa")
+			(uuid "5464e5be-f275-4b9e-a1ed-d62b323875ad")
 			(effects
 				(font
 					(size 1.5 1.5)
@@ -6241,7 +6241,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "1c4348f2-7d25-41e8-805a-1034820b3638")
+			(uuid "69576a28-de89-4798-9629-9ca22b05a3c7")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6253,7 +6253,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "e9a81c9e-bdb0-4281-8926-be7e2225de43")
+			(uuid "072ff36a-917e-4503-9d37-98453dd5a34f")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16720,7 +16720,7 @@
 			)
 		)
 		(property "Value" "SD_SPI"
-			(at -2 8.5 180)
+			(at -2 8 180)
 			(layer "F.SilkS")
 			(uuid "b8ec9e7a-75a3-4f21-8e02-d2d775706e48")
 			(effects
