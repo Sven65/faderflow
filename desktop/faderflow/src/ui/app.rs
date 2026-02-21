@@ -1,15 +1,14 @@
 use crate::audio::{create_backend, AudioBackend, AudioSession, AudioUpdate};
+use crate::ui::views;
 use iced::futures;
-use iced::widget::{button, column, container, row, slider, text, Column, Image};
+use iced::widget::{button, column, container, row, text};
 use iced::{Element, Subscription, Task};
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 pub struct VolumeApp {
-    sessions: HashMap<String, AudioSession>,
+    pub sessions: HashMap<String, AudioSession>,
     receiver: mpsc::Receiver<AudioUpdate>,
     backend: Box<dyn AudioBackend>,
     current_view: View,
@@ -59,7 +58,6 @@ impl VolumeApp {
                 if let Some(session) = self.sessions.get_mut(&id) {
                     session.volume = volume;
                     session.last_local_change = Some(Instant::now());
-
                     let _ = self.backend.set_volume(&id, volume);
                 }
                 Task::none()
@@ -68,17 +66,14 @@ impl VolumeApp {
                 if let Some(session) = self.sessions.get_mut(&id) {
                     session.is_muted = !session.is_muted;
                     session.last_local_change = Some(Instant::now());
-
                     let _ = self.backend.set_mute(&id, session.is_muted);
                 }
                 Task::none()
             }
-            Message::RefreshSessions => {
-                match self.backend.get_sessions() {
-                    Ok(sessions) => Task::done(Message::SessionsUpdated(sessions)),
-                    Err(_) => Task::done(Message::SessionsUpdated(Vec::new())),
-                }
-            }
+            Message::RefreshSessions => match self.backend.get_sessions() {
+                Ok(sessions) => Task::done(Message::SessionsUpdated(sessions)),
+                Err(_) => Task::done(Message::SessionsUpdated(Vec::new())),
+            },
             Message::SessionsUpdated(sessions) => {
                 for session in &sessions {
                     if let Some(existing) = self.sessions.get_mut(&session.id) {
@@ -125,12 +120,12 @@ impl VolumeApp {
                 for update in updates {
                     match update {
                         AudioUpdate::VolumeChanged(ref id, volume) => {
-                            let entry = last_updates.entry(id.clone()).or_insert((None, None));
-                            entry.0 = Some(volume);
+                            last_updates.entry(id.clone()).or_insert((None, None)).0 =
+                                Some(volume);
                         }
                         AudioUpdate::MuteChanged(ref id, muted) => {
-                            let entry = last_updates.entry(id.clone()).or_insert((None, None));
-                            entry.1 = Some(muted);
+                            last_updates.entry(id.clone()).or_insert((None, None)).1 =
+                                Some(muted);
                         }
                         _ => {}
                     }
@@ -138,17 +133,17 @@ impl VolumeApp {
 
                 for (id, (volume_opt, mute_opt)) in last_updates {
                     if let Some(session) = self.sessions.get_mut(&id) {
-                        let ignore_due_to_local = session
+                        let ignore = session
                             .last_local_change
                             .map(|t| t.elapsed() < Duration::from_millis(50))
                             .unwrap_or(false);
 
-                        if !ignore_due_to_local {
-                            if let Some(volume) = volume_opt {
-                                session.volume = volume;
+                        if !ignore {
+                            if let Some(v) = volume_opt {
+                                session.volume = v;
                             }
-                            if let Some(muted) = mute_opt {
-                                session.is_muted = muted;
+                            if let Some(m) = mute_opt {
+                                session.is_muted = m;
                             }
                             session.last_external_change = Some(Instant::now());
                         }
@@ -173,7 +168,6 @@ impl VolumeApp {
     }
 
     pub fn view(&self) -> Element<Message> {
-        // Sidebar
         let sidebar = container(
             column![
                 self.sidebar_button("🎵 Sessions", View::Sessions),
@@ -181,48 +175,40 @@ impl VolumeApp {
                 self.sidebar_button("ℹ️ About", View::About),
             ]
                 .spacing(10)
-                .padding(20)
+                .padding(20),
         )
             .width(200)
             .height(iced::Length::Fill)
-            .style(|theme: &iced::Theme| {
-                container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.15))),
-                    ..Default::default()
-                }
+            .style(|_theme: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.15, 0.15, 0.15,
+                ))),
+                ..Default::default()
             });
 
-        // Main content based on current view
-        let main_content = container(
-            match self.current_view {
-                View::Sessions => self.sessions_view(),
-                View::Settings => self.settings_view(),
-                View::About => self.about_view(),
-            }
-        )
+        let main_content = container(match self.current_view {
+            View::Sessions => views::sessions::view(&self.sessions),
+            View::Settings => views::settings::view(),
+            View::About => views::about::view(),
+        })
             .width(iced::Length::Fill)
             .height(iced::Length::Fill)
             .padding(20);
 
-        // Combine sidebar and content
         row![sidebar, main_content].into()
     }
 
-    // Helper to create sidebar buttons with active state
     fn sidebar_button<'a>(&'a self, label: &'a str, view: View) -> Element<'a, Message> {
         let is_active = self.current_view == view;
-
-        let btn = button(text(label))
-            .width(iced::Length::Fill)
-            .padding(10);
+        let btn = button(text(label)).width(iced::Length::Fill).padding(10);
 
         let btn = if is_active {
-            btn.style(|theme: &iced::Theme, status| {
-                button::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgb(0.3, 0.3, 0.3))),
-                    text_color: iced::Color::WHITE,
-                    ..button::primary(theme, status)
-                }
+            btn.style(|theme: &iced::Theme, status| button::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.3, 0.3, 0.3,
+                ))),
+                text_color: iced::Color::WHITE,
+                ..button::primary(theme, status)
             })
         } else {
             btn
@@ -235,98 +221,9 @@ impl VolumeApp {
         }
     }
 
-    // Sessions view (your original content)
-    fn sessions_view<'a>(&'a self) -> Element<'a, Message> {
-        let mut content: Column<Message> = column![
-            text("Audio Sessions").size(24)
-        ]
-            .spacing(20);
-
-        if self.sessions.is_empty() {
-            content = content.push(text("No audio sessions found. Play some audio..."));
-        }
-
-        for (id, session) in &self.sessions {
-            let slider_widget = slider(0.0..=1.0, session.volume, {
-                let id = id.clone();
-                move |v| Message::VolumeChanged(id.clone(), v)
-            })
-                .step(0.01);
-
-            let mute_button = button(text(if session.is_muted { "🔇" } else { "🔊" }))
-                .on_press({
-                    let id = id.clone();
-                    Message::ToggleMute(id)
-                });
-
-            let header = if let Some(icon_handle) = &session.icon_handle {
-                row![
-                    Image::new(icon_handle.as_ref().clone())
-                        .width(24)
-                        .height(24),
-                    text(&session.display_name)
-                ]
-                    .spacing(10)
-                    .align_y(iced::Alignment::Center)
-            } else {
-                row![text(&session.display_name)]
-            };
-
-            let volume_control = row![
-                slider_widget,
-                text(format!("{}%", (session.volume * 100.0) as i32)).width(50),
-                mute_button
-            ]
-                .spacing(10)
-                .align_y(iced::Alignment::Center);
-
-            content = content.push(
-                container(
-                    column![header, volume_control].spacing(5)
-                )
-                    .padding(10)
-                    .style(|theme: &iced::Theme| {
-                        container::Style {
-                            background: Some(iced::Background::Color(iced::Color::from_rgb(0.1, 0.1, 0.1))),
-                            border: iced::Border {
-                                radius: 5.0.into(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    })
-            );
-        }
-
-        column![content].into()
-    }
-
-    // Settings view
-    fn settings_view<'a>(&'a self) -> Element<'a, Message> {
-        column![
-            text("Settings").size(24),
-            text("Settings options will go here...").size(16),
-        ]
-            .spacing(20)
-            .into()
-    }
-
-    // About view
-    fn about_view<'a>(&'a self) -> Element<'a, Message> {
-        column![
-            text("About FaderFlow").size(24),
-            text(format!("Version {}", VERSION)).size(16),
-            text("A motorized volume controller with individual displays").size(14),
-            text("").size(10),
-            text("Created by Mackan").size(14),
-        ]
-            .spacing(10)
-            .into()
-    }
-
     pub fn subscription(&self) -> Subscription<Message> {
         let refresh_timer =
-            iced::time::every(std::time::Duration::from_secs(2)).map(|_| Message::RefreshSessions);
+            iced::time::every(Duration::from_secs(2)).map(|_| Message::RefreshSessions);
 
         let receiver_subscription = iced::Subscription::run(|| {
             use futures::stream::StreamExt;
@@ -337,7 +234,6 @@ impl VolumeApp {
                 |mut output: futures::channel::mpsc::Sender<Message>| async move {
                     loop {
                         tokio::time::sleep(std::time::Duration::from_millis(16)).await;
-
                         let _ = output.try_send(Message::PollReceiver);
                     }
                 },
