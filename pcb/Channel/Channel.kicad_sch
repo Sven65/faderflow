@@ -8,6 +8,190 @@
 		(title "FaderFlow Channel Board")
 	)
 	(lib_symbols
+		(symbol "Behringer X32 Fader:Fader_Motorized_100mm"
+			(pin_names
+				(offset 0)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "F"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_locked" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Fader_Motorized_100mm_1_1"
+				(rectangle
+					(start 1.27 5.08)
+					(end 3.81 0)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin input line
+					(at 2.54 7.62 270)
+					(length 2.54)
+					(name "T1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 2.54 -2.54 90)
+					(length 2.54)
+					(name "T2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 6.35 2.54 180)
+					(length 2.54)
+					(name "W"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(symbol "Fader_Motorized_100mm_2_1"
+				(circle
+					(center 3.81 1.27)
+					(radius 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(text "M"
+					(at 3.81 1.27 0)
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(pin input line
+					(at 0 1.27 0)
+					(length 2.54)
+					(name "M-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at 7.62 1.27 180)
+					(length 2.54)
+					(name "M+"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Connector_Generic:Conn_01x02"
 			(pin_names
 				(offset 1.016)
@@ -1376,6 +1560,190 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Fader_Motorized_100mm_1"
+			(pin_names
+				(offset 0)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "F"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_locked" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Fader_Motorized_100mm_1_1_1"
+				(rectangle
+					(start 1.27 5.08)
+					(end 3.81 0)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin input line
+					(at 2.54 7.62 270)
+					(length 2.54)
+					(name "T1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 2.54 -2.54 90)
+					(length 2.54)
+					(name "T2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 6.35 2.54 180)
+					(length 2.54)
+					(name "W"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(symbol "Fader_Motorized_100mm_1_2_1"
+				(circle
+					(center 3.81 1.27)
+					(radius 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(text "M"
+					(at 3.81 1.27 0)
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(pin input line
+					(at 0 1.27 0)
+					(length 2.54)
+					(name "M-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at 7.62 1.27 180)
+					(length 2.54)
+					(name "M+"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "ST7789:1.54{dblquote}"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -1665,6 +2033,16 @@
 	)
 	(wire
 		(pts
+			(xy 66.04 143.51) (xy 67.31 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "16e803c4-ead7-416e-b57d-fc29e749c5da")
+	)
+	(wire
+		(pts
 			(xy 99.06 104.14) (xy 104.14 104.14)
 		)
 		(stroke
@@ -1682,6 +2060,16 @@
 			(type default)
 		)
 		(uuid "32ff073d-b8cd-4bf1-9a10-89a1cff5552b")
+	)
+	(wire
+		(pts
+			(xy 77.47 143.51) (xy 78.74 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "39255a0e-24ff-4734-8ab7-203a6ef56057")
 	)
 	(wire
 		(pts
@@ -1845,6 +2233,16 @@
 	)
 	(wire
 		(pts
+			(xy 67.31 156.21) (xy 68.58 156.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "731061fc-23f7-47b6-8852-d1c37b4433e7")
+	)
+	(wire
+		(pts
 			(xy 147.32 93.98) (xy 149.86 93.98)
 		)
 		(stroke
@@ -1885,6 +2283,16 @@
 	)
 	(wire
 		(pts
+			(xy 76.2 156.21) (xy 77.47 156.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "84a67ef6-a7a1-427d-b663-250c3b779ab8")
+	)
+	(wire
+		(pts
 			(xy 100.33 64.77) (xy 101.6 64.77)
 		)
 		(stroke
@@ -1892,6 +2300,16 @@
 			(type default)
 		)
 		(uuid "9a6e5887-ef50-4dd8-9ae8-d097d880e562")
+	)
+	(wire
+		(pts
+			(xy 72.39 138.43) (xy 72.39 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a5a35db1-82a7-418a-acd2-796dec443be4")
 	)
 	(wire
 		(pts
@@ -2053,6 +2471,28 @@
 		)
 		(uuid "f8f3c2bf-6753-49fc-ac23-99663673c960")
 	)
+	(global_label "MOTOR+"
+		(shape input)
+		(at 67.31 156.21 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "03bc9518-748f-497e-93d0-28f5ee20ee87")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 56.4024 156.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "SCREEN_RST"
 		(shape input)
 		(at 99.06 101.6 180)
@@ -2071,6 +2511,28 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "MOTOR-"
+		(shape input)
+		(at 77.47 156.21 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "06ff0aed-3581-457e-bb8c-77b195e4a87e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 88.3776 156.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 				(hide yes)
 			)
 		)
@@ -2176,6 +2638,28 @@
 		(uuid "37414e0d-17fc-4265-9a02-5cfbc577fdba")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 44.45 78.8996 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "E_VCC"
+		(shape input)
+		(at 78.74 143.51 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "4a34c2e6-d64e-43bf-b78e-85e41904a2f4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 87.4704 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2423,6 +2907,28 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "FADER_OUT"
+		(shape input)
+		(at 72.39 138.43 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "96f99677-65bd-4ebd-9694-0f18c1f7a293")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 72.39 124.9824 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 				(hide yes)
 			)
 		)
@@ -2704,6 +3210,28 @@
 		(uuid "cbc0477f-9e23-46c2-8514-8659c7f52e01")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 132.1792 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 66.04 143.51 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "cc92be99-2a18-458f-a748-0d228beaa893")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 59.1843 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3121,6 +3649,83 @@
 		)
 	)
 	(symbol
+		(lib_name "Fader_Motorized_100mm_1")
+		(lib_id "Behringer X32 Fader:Fader_Motorized_100mm")
+		(at 76.2 154.94 180)
+		(unit 2)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "6b5d8508-5c1f-44aa-b516-e246019a1016")
+		(property "Reference" "F1"
+			(at 72.39 153.162 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "~"
+			(at 72.39 154.178 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Behringer X32 Fader:Behringer X32 Fader"
+			(at 76.2 154.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 76.2 154.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 76.2 154.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "ff4a7808-7099-4161-ae12-ae455fa0df8e")
+		)
+		(pin "2"
+			(uuid "9fa5c3c4-95ba-4194-9bbf-6f6f83181e64")
+		)
+		(pin "3"
+			(uuid "1253b405-45c2-4813-8f30-64fd395a7579")
+		)
+		(pin ""
+			(uuid "6f5d2a70-4f18-4c60-852f-45a13dda9e52")
+		)
+		(pin ""
+			(uuid "11564ece-a57c-41b3-baeb-6ee52ceaf132")
+		)
+		(instances
+			(project ""
+				(path "/ead282b0-17b2-4cc3-b90b-ddb237906d62"
+					(reference "F1")
+					(unit 2)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x05")
 		(at 154.94 78.74 0)
 		(unit 1)
@@ -3329,6 +3934,82 @@
 			(project ""
 				(path "/ead282b0-17b2-4cc3-b90b-ddb237906d62"
 					(reference "C1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Behringer X32 Fader:Fader_Motorized_100mm")
+		(at 74.93 146.05 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d7d8b62a-a282-4ede-91d0-167a3f105d64")
+		(property "Reference" "F1"
+			(at 72.39 146.304 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "~"
+			(at 74.93 146.05 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Behringer X32 Fader:Behringer X32 Fader"
+			(at 74.93 146.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 74.93 146.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 74.93 146.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "ff4a7808-7099-4161-ae12-ae455fa0df8e")
+		)
+		(pin "2"
+			(uuid "9fa5c3c4-95ba-4194-9bbf-6f6f83181e64")
+		)
+		(pin "3"
+			(uuid "1253b405-45c2-4813-8f30-64fd395a7579")
+		)
+		(pin ""
+			(uuid "6f5d2a70-4f18-4c60-852f-45a13dda9e52")
+		)
+		(pin ""
+			(uuid "11564ece-a57c-41b3-baeb-6ee52ceaf132")
+		)
+		(instances
+			(project ""
+				(path "/ead282b0-17b2-4cc3-b90b-ddb237906d62"
+					(reference "F1")
 					(unit 1)
 				)
 			)
