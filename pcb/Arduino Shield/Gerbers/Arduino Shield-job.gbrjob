@@ -5,7 +5,7 @@
       "Application": "Pcbnew",
       "Version": "9.0.3"
     },
-    "CreationDate": "2026-02-21T11:24:44+01:00"
+    "CreationDate": "2026-02-23T11:54:41+01:00"
   },
   "GeneralSpecs": {
     "ProjectId": {
@@ -50,6 +50,16 @@
       "Path": "Arduino Shield-B_Silkscreen.gbr",
       "FileFunction": "Legend,Bot",
       "FilePolarity": "Positive"
+    },
+    {
+      "Path": "Arduino Shield-F_Mask.gbr",
+      "FileFunction": "SolderMask,Top",
+      "FilePolarity": "Negative"
+    },
+    {
+      "Path": "Arduino Shield-B_Mask.gbr",
+      "FileFunction": "SolderMask,Bot",
+      "FilePolarity": "Negative"
     },
     {
       "Path": "Arduino Shield-Edge_Cuts.gbr",
