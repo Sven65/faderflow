@@ -17,6 +17,7 @@ pub struct DeviceInfo {
     pub rename: Option<String>,
     pub status: DeviceStatus,
     pub watchdog_cancel: Arc<AtomicBool>,
+    pub channel_assignments: [String; 5],
 }
 
 impl DeviceInfo {
@@ -24,7 +25,6 @@ impl DeviceInfo {
         self.rename.as_deref().unwrap_or(&self.port_name)
     }
 
-    /// Formats a UUID byte array as "AABBCCDD-EEFFGGHH-..."
     pub fn uuid_str(uuid: &[u8; 16]) -> String {
         uuid.chunks(4)
             .map(|c| c.iter().map(|b| format!("{b:02X}")).collect::<String>())

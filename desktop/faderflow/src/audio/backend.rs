@@ -7,6 +7,7 @@ pub enum AudioUpdate {
     MuteChanged(String, bool),
     SessionAdded(AudioSession),
     SessionRemoved(String),
+    DefaultDeviceChanged(String), // friendly name of new default output
 }
 
 pub trait AudioBackend: Send + Sync {
@@ -27,4 +28,10 @@ pub trait AudioBackend: Send + Sync {
 
     /// Stop listening for audio events
     fn stop_listening(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+
+    /// Get all active output (render) devices by friendly name
+    fn get_output_devices(&self) -> Result<Vec<String>, Box<dyn std::error::Error>>;
+
+    /// Get the friendly name of the current default output device
+    fn get_default_output_device(&self) -> Option<String>;
 }

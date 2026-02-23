@@ -35,4 +35,12 @@ impl AudioBackend for LinuxAudioBackend {
     fn stop_listening(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
+
+    fn get_output_devices(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(vec![])
+    }
+
+    fn get_default_output_device(&self) -> Option<String> {
+        None
+    }
 }

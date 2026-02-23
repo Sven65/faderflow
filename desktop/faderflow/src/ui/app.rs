@@ -9,7 +9,11 @@ use iced::{Element, Subscription, Task};
 use crate::audio::{create_backend, AudioBackend, AudioSession, AudioUpdate};
 use crate::comms::scanner::{self, ScanEvent, RESCAN_DELAY_SECS};
 use crate::comms::device_info::{DeviceInfo, DeviceStatus};
-use crate::utils::config::{load_device_renames, save_device_renames};
+use crate::utils::config::{
+    load_device_renames, load_device_assignments,
+    save_device_renames, save_device_assignments,
+    send_app_name, send_volume,
+};
 use crate::ui::views;
 use crate::ui::views::no_devices::NoDevicesReason;
 use crate::ui::views::scanning::{LogKind, ScanningState};
@@ -36,6 +40,8 @@ pub struct ReadyState {
     pub current_view: View,
     pub rename_drafts: Vec<String>,
     pub debug_open: Vec<bool>,
+    pub output_devices: Vec<String>,
+    pub current_output: Option<String>,
 }
 
 // ── App ──────────────────────────────────────────────────────────────────────
@@ -70,6 +76,9 @@ pub enum Message {
     DeviceRenameCommit(usize),
     DeviceToggleDebug(usize),
     DeviceDisconnect(usize),
+    DeviceChannelAssign(usize, usize, String), // device_idx, channel, session_name
+    DeviceSync(usize),
+    SelectOutput(String),                      // ← was missing from enum
 }
 
 // ── Constructor ──────────────────────────────────────────────────────────────
@@ -183,7 +192,13 @@ impl VolumeApp {
                             AudioUpdate::MuteChanged(ref id, m) => {
                                 last_updates.entry(id.clone()).or_default().1 = Some(m);
                             }
-                            _ => {}
+                            AudioUpdate::DefaultDeviceChanged(name) => {
+                                s.current_output = Some(name);
+                                return Task::done(Message::RefreshSessions);
+                            }
+                            AudioUpdate::SessionAdded(_) | AudioUpdate::SessionRemoved(_) => {
+                                return Task::done(Message::RefreshSessions);
+                            }
                         }
                     }
                     for (id, (vol, mute)) in last_updates {
@@ -205,12 +220,18 @@ impl VolumeApp {
 
             // ── Scanning ──────────────────────────────────────────────────
             Message::StartScan => {
+                // Drop all existing devices so their ports are freed before scanning
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    for dev in state.devices.drain(..) {
+                        dev.cancel_watchdog();
+                        drop(dev.port);
+                    }
+                }
                 self.screen = AppScreen::Scanning(ScanningState::default());
-                // Drain stale watchdog events from previous session
                 if let Ok(rx) = self.watchdog_rx.lock() {
                     while rx.try_recv().is_ok() {}
                 }
-                let rx = scanner::start_scan();
+                let rx = scanner::start_scan_delayed(500);
                 self.scan_rx = Some(Arc::new(Mutex::new(rx)));
                 Task::none()
             }
@@ -228,8 +249,6 @@ impl VolumeApp {
                 Task::none()
             }
             Message::WatchdogTick => {
-                // Only transition to DeviceLost from Ready — if we're already
-                // in NoDevices the countdown is running and we must not reset it
                 let already_lost = matches!(self.screen, AppScreen::NoDevices(_));
                 let events: Vec<ScanEvent> = {
                     let rx = self.watchdog_rx.lock().unwrap();
@@ -291,17 +310,57 @@ impl VolumeApp {
                 }
                 Task::none()
             }
+            Message::SelectOutput(name) => {
+                if let AppScreen::Ready(s) = &mut self.screen {
+                    s.current_output = Some(name);
+                }
+                Task::done(Message::RefreshSessions)
+            }
+            Message::DeviceChannelAssign(dev_idx, ch, session) => {
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    if let Some(dev) = state.devices.get_mut(dev_idx) {
+                        if ch < 5 {
+                            dev.channel_assignments[ch] = session;
+                            save_device_assignments(&state.devices);
+                        }
+                    }
+                }
+                Task::none()
+            }
+            Message::DeviceSync(dev_idx) => {
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    if let Some(dev) = state.devices.get_mut(dev_idx) {
+                        let port = Arc::clone(&dev.port);
+                        for (ch, session_name) in dev.channel_assignments.iter().enumerate() {
+                            if let Ok(mut p) = port.lock() {
+                                send_app_name(&mut **p, ch as u8, session_name);
+                                let vol = if session_name.is_empty() {
+                                    0
+                                } else {
+                                    state.sessions.get(session_name)
+                                        .map(|s| (s.volume * 100.0) as u8)
+                                        .unwrap_or(0)
+                                };
+                                send_volume(&mut **p, ch as u8, vol);
+                            }
+                        }
+                    }
+                }
+                Task::none()
+            }
             Message::DeviceDisconnect(idx) => {
                 if let AppScreen::Ready(state) = &mut self.screen {
                     if idx < state.devices.len() {
                         let dev = state.devices.remove(idx);
-                        dev.cancel_watchdog(); // stop watchdog before dropping port
+                        dev.cancel_watchdog();
                         drop(dev.port);
                         state.rename_drafts.remove(idx);
                         state.debug_open.remove(idx);
                     }
+                    if state.devices.is_empty() {
+                        self.screen = AppScreen::NoDevices(NoDevicesReason::NoneFound);
+                    }
                 }
-                self.screen = AppScreen::NoDevices(NoDevicesReason::NoneFound);
                 Task::none()
             }
         }
@@ -354,15 +413,22 @@ impl VolumeApp {
                 };
 
                 let saved_renames = load_device_renames();
+                let saved_assignments = load_device_assignments();
                 let n = raw_devices.len();
                 let devices: Vec<DeviceInfo> = raw_devices
                     .into_iter()
                     .map(|(port_name, port, uuid, version, watchdog_cancel)| {
-                        let rename = saved_renames.get(&DeviceInfo::uuid_str(&uuid)).cloned();
+                        let uuid_str = DeviceInfo::uuid_str(&uuid);
+                        let rename = saved_renames.get(&uuid_str).cloned();
+                        let channel_assignments = saved_assignments
+                            .get(&uuid_str)
+                            .cloned()
+                            .unwrap_or_default();
                         DeviceInfo {
                             port_name, port, uuid, version, rename,
                             status: DeviceStatus::Connected,
                             watchdog_cancel,
+                            channel_assignments,
                         }
                     })
                     .collect();
@@ -373,6 +439,8 @@ impl VolumeApp {
                     current_view: View::Sessions,
                     rename_drafts: vec![String::new(); n],
                     debug_open: vec![false; n],
+                    output_devices: self.backend.get_output_devices().unwrap_or_default(),
+                    current_output: self.backend.get_default_output_device(),
                 });
             }
             ScanEvent::ScanFailed(reason) => {
@@ -423,11 +491,17 @@ impl VolumeApp {
             View::Sessions => views::sessions::view(&state.sessions),
             View::Settings => views::settings::view(),
             View::About    => views::about::view(),
-            View::Devices  => views::devices::view(
-                &state.devices,
-                &state.rename_drafts,
-                &state.debug_open,
-            ),
+            View::Devices  => {
+                let session_names: Vec<String> = state.sessions.keys().cloned().collect();
+                views::devices::view(
+                    &state.devices,
+                    &state.rename_drafts,
+                    &state.debug_open,
+                    session_names,
+                    &state.output_devices,
+                    state.current_output.clone(),
+                )
+            }
         })
             .width(iced::Length::Fill)
             .height(iced::Length::Fill)
@@ -478,7 +552,6 @@ impl VolumeApp {
             AppScreen::Ready(_) => {
                 subs.push(
                     Subscription::run(|| {
-                        use futures::stream::StreamExt;
                         use iced::stream;
                         stream::channel(
                             100,

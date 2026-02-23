@@ -204,3 +204,12 @@ fn probe_port(port_name: &str) -> Result<(Box<dyn SerialPort + Send>, [u8; 16], 
         return Ok((port, response.uuid, (response.version_major, response.version_minor)));
     }
 }
+
+pub fn start_scan_delayed(delay_ms: u64) -> mpsc::Receiver<ScanEvent> {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(delay_ms));
+        run_scan(tx);
+    });
+    rx
+}
