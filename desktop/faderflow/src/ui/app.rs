@@ -12,7 +12,8 @@ use crate::comms::device_info::{DeviceInfo, DeviceStatus};
 use crate::utils::config::{
     load_device_renames, load_device_assignments,
     save_device_renames, save_device_assignments,
-    send_app_name, send_volume,
+    send_app_name, send_volume, send_icon,
+    send_calibration_start, send_calibration_cancel,
 };
 use crate::ui::views;
 use crate::ui::views::no_devices::NoDevicesReason;
@@ -21,6 +22,7 @@ use crate::ui::views::scanning::{LogKind, ScanningState};
 use crate::comms::protocol::{
     FaderMessage, HandshakeResponse,
     CMD_FADER_UPDATE, CMD_HANDSHAKE_RESPONSE,
+    CMD_CALIBRATION_STATUS,
 };
 
 // ── App screens ──────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ pub struct ReadyState {
     pub debug_open: Vec<bool>,
     pub output_devices: Vec<String>,
     pub current_output: Option<String>,
+    pub needs_initial_sync: bool,
 }
 
 // ── App ──────────────────────────────────────────────────────────────────────
@@ -85,6 +88,8 @@ pub enum Message {
     DeviceSync(usize),
     SelectOutput(String),
     PollSerial,
+    DeviceCalibrate(usize),
+    DeviceCalibrateCancel(usize),
 }
 
 // ── Constructor ──────────────────────────────────────────────────────────────
@@ -184,6 +189,15 @@ impl VolumeApp {
                         }
                     }
                     s.sessions.retain(|id, _| sessions.iter().any(|s| &s.id == id));
+
+                    // First session load after connect: push full state to devices
+                    if s.needs_initial_sync && !s.devices.is_empty() {
+                        s.needs_initial_sync = false;
+                        let n = s.devices.len();
+                        return Task::batch(
+                            (0..n).map(|i| Task::done(Message::DeviceSync(i))),
+                        );
+                    }
                 }
                 Task::none()
             }
@@ -341,11 +355,27 @@ impl VolumeApp {
             Message::DeviceSync(dev_idx) => {
                 if let AppScreen::Ready(state) = &mut self.screen {
                     if let Some(dev) = state.devices.get_mut(dev_idx) {
+                        if dev.cal_state.is_some() { return Task::none(); }
                         let port = Arc::clone(&dev.port);
                         for (ch, session_name) in dev.channel_assignments.iter().enumerate() {
                             if let Ok(mut p) = port.lock() {
                                 send_app_name(&mut **p, ch as u8, session_name);
                                 std::thread::sleep(Duration::from_millis(60)); // let the redraw finish
+
+                                if !session_name.is_empty() {
+                                    if let Some(sess) = state.sessions.get(session_name) {
+                                        if let Some(exe) = &sess.exe_path {
+                                            if let Some((w, h, rgba)) =
+                                                crate::utils::icon::extract_icon_rgba(exe)
+                                            {
+                                                let data = crate::utils::icon::rgba_to_rgb565_icon(w, h, &rgba);
+                                                send_icon(&mut **p, ch as u8, &data);
+                                                std::thread::sleep(Duration::from_millis(50));
+                                            }
+                                        }
+                                    }
+                                }
+
                                 let vol = if session_name.is_empty() {
                                     0
                                 } else {
@@ -377,11 +407,36 @@ impl VolumeApp {
                 }
                 Task::none()
             }
+            Message::DeviceCalibrate(idx) => {
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    if let Some(dev) = state.devices.get_mut(idx) {
+                        if let Ok(mut p) = dev.port.lock() {
+                            send_calibration_start(&mut **p);
+                            dev.cal_state = Some((0, 0));
+                        }
+                    }
+                }
+                Task::none()
+            }
+            Message::DeviceCalibrateCancel(idx) => {
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    if let Some(dev) = state.devices.get_mut(idx) {
+                        if let Ok(mut p) = dev.port.lock() {
+                            send_calibration_cancel(&mut **p);
+                        }
+                        // Device confirms with status 3 (and we resync then);
+                        // clear now so the UI unlocks even if that gets lost
+                        dev.cal_state = None;
+                    }
+                }
+                Task::none()
+            }
             Message::PollSerial => {
                 let mut volume_writes: Vec<(String, f32)> = vec![];
+                let mut resync: Vec<usize> = vec![];
 
                 if let AppScreen::Ready(state) = &mut self.screen {
-                    for dev in state.devices.iter_mut() {
+                    for (di, dev) in state.devices.iter_mut().enumerate() {
                         let chunk = {
                             let Ok(mut p) = dev.port.lock() else { continue };
                             let avail = p.bytes_to_read().unwrap_or(0) as usize;
@@ -398,6 +453,7 @@ impl VolumeApp {
                             let Some(&cmd) = dev.rx_buf.first() else { break };
                             let len = match cmd {
                                 CMD_FADER_UPDATE => std::mem::size_of::<FaderMessage>(),
+                                CMD_CALIBRATION_STATUS => 3,
                                 // stray beacon between REQUEST and ACK — skip whole
                                 CMD_HANDSHAKE_RESPONSE => std::mem::size_of::<HandshakeResponse>(),
                                 _ => { dev.rx_buf.remove(0); continue } // resync
@@ -421,8 +477,25 @@ impl VolumeApp {
                                     }
                                 }
                             }
+                            else if cmd == CMD_CALIBRATION_STATUS {
+                                let ch = dev.rx_buf[1];
+                                let phase = dev.rx_buf[2];
+                                if phase >= 2 {
+                                    // done (2) or cancelled (3): restore screens
+                                    dev.cal_state = None;
+                                    resync.push(di);
+                                } else {
+                                    dev.cal_state = Some((ch, phase));
+                                }
+                            }
                             dev.rx_buf.drain(..len);
                         }
+                    }
+
+                    if !resync.is_empty() {
+                        return Task::batch(
+                            resync.into_iter().map(|i| Task::done(Message::DeviceSync(i))),
+                        );
                     }
 
                     for (session, vol) in volume_writes {
@@ -503,6 +576,7 @@ impl VolumeApp {
                             rx_buf: Vec::new(),
                             channel_volumes: [255; 5],
                             last_fader_rx: [None; 5],
+                            cal_state: None,
                         }
                     })
                     .collect();
@@ -515,6 +589,7 @@ impl VolumeApp {
                     debug_open: vec![false; n],
                     output_devices: self.backend.get_output_devices().unwrap_or_default(),
                     current_output: self.backend.get_default_output_device(),
+                    needs_initial_sync: true,
                 });
             }
             ScanEvent::ScanFailed(reason) => {
@@ -666,6 +741,7 @@ impl VolumeApp {
     fn push_volume_to_devices(devices: &mut [DeviceInfo], session_id: &str, volume: f32) {
         let pct = (volume * 100.0).round().clamp(0.0, 100.0) as u8;
         for dev in devices.iter_mut() {
+            if dev.cal_state.is_some() { continue; }  // calibration in progress
             for ch in 0..5 {
                 if dev.channel_assignments[ch] != session_id { continue; }
                 // Touch hold-off: hand is on the fader — it's the source of truth

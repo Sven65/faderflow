@@ -1,5 +1,5 @@
 #[cfg(target_os = "windows")]
-pub fn extract_icon_to_handle(exe_path: &str) -> Option<iced::widget::image::Handle> {
+pub fn extract_icon_rgba(exe_path: &str) -> Option<(u32, u32, Vec<u8>)> {
     use windows::Win32::UI::Shell::*;
     use windows::Win32::UI::WindowsAndMessaging::*;
     use windows::Win32::Graphics::Gdi::*;
@@ -92,15 +92,42 @@ pub fn extract_icon_to_handle(exe_path: &str) -> Option<iced::widget::image::Han
         DeleteObject(icon_info.hbmMask.into());
         DestroyIcon(large_icon);
 
-        Some(iced::widget::image::Handle::from_rgba(
-            width,
-            height,
-            rgba_data,
-        ))
+        Some((width, height, rgba_data))
     }
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn extract_icon_to_handle(_exe_path: &str) -> Option<iced::widget::image::Handle> {
+pub fn extract_icon_rgba(_exe_path: &str) -> Option<(u32, u32, Vec<u8>)> {
     None
+}
+
+pub fn extract_icon_to_handle(exe_path: &str) -> Option<iced::widget::image::Handle> {
+    extract_icon_rgba(exe_path)
+        .map(|(w, h, rgba)| iced::widget::image::Handle::from_rgba(w, h, rgba))
+}
+
+/// Nearest-neighbor resize to 64x64, alpha-blend onto the device icon
+/// background (0x2124), emit big-endian RGB565 — exactly 8192 bytes.
+pub fn rgba_to_rgb565_icon(w: u32, h: u32, rgba: &[u8]) -> Vec<u8> {
+    const SIZE: u32 = 64;
+    const BG: (u16, u16, u16) = (33, 36, 33);  // device ICON_BG 0x2124
+    let mut out = Vec::with_capacity((SIZE * SIZE * 2) as usize);
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let sx = (x * w / SIZE).min(w - 1);
+            let sy = (y * h / SIZE).min(h - 1);
+            let i = ((sy * w + sx) * 4) as usize;
+            let (r, g, b, a) = (
+                rgba[i] as u16, rgba[i + 1] as u16,
+                rgba[i + 2] as u16, rgba[i + 3] as u16,
+            );
+            let r = (r * a + BG.0 * (255 - a)) / 255;
+            let g = (g * a + BG.1 * (255 - a)) / 255;
+            let b = (b * a + BG.2 * (255 - a)) / 255;
+            let px: u16 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+            out.push((px >> 8) as u8);   // high byte first — firmware expects this
+            out.push((px & 0xFF) as u8);
+        }
+    }
+    out
 }

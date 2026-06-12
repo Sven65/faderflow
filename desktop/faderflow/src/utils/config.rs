@@ -6,6 +6,8 @@ use serialport::SerialPort;
 use crate::comms::device_info::DeviceInfo;
 use crate::comms::protocol::{
     CMD_DISPLAY_UPDATE_APP_NAME, CMD_DISPLAY_UPDATE_APP_VOLUME,
+    CMD_DISPLAY_UPDATE_ICON,
+    CMD_CALIBRATION_START, CMD_CALIBRATION_CANCEL,
     DisplayUpdateAppCommand, DisplayUpdateVolumeCommand,
 };
 
@@ -130,4 +132,22 @@ fn save_section(section: &str, value: toml::map::Map<String, toml::Value>) {
     let mut full = load_full();
     full.insert(section.into(), toml::Value::Table(value));
     save_full(full);
+}
+
+pub fn send_icon(port: &mut dyn SerialPort, channel: u8, rgb565: &[u8]) {
+    if rgb565.len() != 64 * 64 * 2 { return; }
+    let _ = port.write_all(&[CMD_DISPLAY_UPDATE_ICON, channel]);
+    let _ = port.write_all(rgb565);  // UART paces this (~0.75s)
+    let _ = port.flush();
+}
+
+
+pub fn send_calibration_start(port: &mut dyn SerialPort) {
+    let _ = port.write_all(&[CMD_CALIBRATION_START]);
+    let _ = port.flush();
+}
+
+pub fn send_calibration_cancel(port: &mut dyn SerialPort) {
+    let _ = port.write_all(&[CMD_CALIBRATION_CANCEL]);
+    let _ = port.flush();
 }

@@ -7,12 +7,21 @@
 
 Fader::Fader(uint8_t motorA, uint8_t motorB, uint8_t analogPin)
   : motorA(motorA), motorB(motorB), analogPin(analogPin) {
+  calMin = FADER_RAW_MIN;
+  calMax = FADER_RAW_MAX;
   lastRawValue = -1;
   lastReported = -1;
   lastReadTime = 0;
   target = -1;
   seeking = false;
   seekStart = 0;
+  prevSeekPos = 0;
+  lastVelSample = 0;
+  velocity = 0;
+  settleUntil = 0;
+  seekRetries = 0;
+  crawlBoost = 0;
+  stallCount = 0;
   moved = false;
 }
 
@@ -29,10 +38,13 @@ void Fader::begin() {
 }
 
 int Fader::rawToPercent(int raw) {
+  // Pots never reach the rails at their physical stops — map the
+  // calibrated usable range so 0% and 100% are reachable positions
+  raw = constrain(raw, calMin, calMax);
 #if FADER_INVERTED
-  return map(raw, 1023, 0, 0, 100);
+  return map(raw, calMax, calMin, 0, 100);
 #else
-  return map(raw, 0, 1023, 0, 100);
+  return map(raw, calMin, calMax, 0, 100);
 #endif
 }
 
@@ -51,13 +63,17 @@ void Fader::motorWrite(int speed) {
   }
 }
 
-int Fader::read() {
+int Fader::readRawAveraged() {
   // ADC mux settle, then average — from the bring-up sketch
   analogRead(analogPin);
   delayMicroseconds(100);
   long sum = 0;
   for (uint8_t k = 0; k < 8; k++) sum += analogRead(analogPin);
-  return rawToPercent(sum / 8);
+  return sum / 8;
+}
+
+int Fader::read() {
+  return rawToPercent(readRawAveraged());
 }
 
 void Fader::setTarget(int percent) {
@@ -69,6 +85,13 @@ void Fader::setTarget(int percent) {
   target = percent;
   seeking = true;
   seekStart = millis();
+  prevSeekPos = getPosition();
+  lastVelSample = millis();
+  velocity = 0;
+  settleUntil = 0;
+  seekRetries = 0;
+  crawlBoost = 0;
+  stallCount = 0;
 }
 
 bool Fader::isSeeking() {
@@ -84,6 +107,7 @@ void Fader::stop() {
   motorWrite(0);
   seeking = false;
   target = -1;
+  settleUntil = 0;
 }
 
 void Fader::update() {
@@ -92,25 +116,78 @@ void Fader::update() {
   if (seeking) {
     // Seek loop runs unthrottled for responsive control
     int pos = read();
+
+    // Post-brake settle: let the mechanics come to rest, then verify
+    if (settleUntil) {
+      if (now < settleUntil) return;
+      settleUntil = 0;
+      int err = target - pos;
+      if (abs(err) <= FADER_SEEK_DEADBAND || seekRetries >= FADER_SEEK_MAX_RETRIES) {
+        // Arrived (or close enough after max retries) — finish
+        seeking = false;
+        target = -1;
+
+        // Re-sync state so the motor's own movement doesn't
+        // register as a user touch and echo back to the host
+        lastRawValue = analogRead(analogPin);
+        lastReported = rawToPercent(lastRawValue);
+        return;
+      }
+      // Bounced off target/end stop — creep back
+      seekRetries++;
+      crawlBoost = 0;
+      seekStart = now;  // fresh timeout for the correction pass
+    }
+
     int err = target - pos;
 
-    if (abs(err) <= FADER_SEEK_DEADBAND || now - seekStart > FADER_SEEK_TIMEOUT) {
-      motorWrite(0);  // brake
-      seeking = false;
-      target = -1;
+    // Velocity estimate + anti-stall, sampled every 8 ms
+    if (now - lastVelSample >= 8) {
+      velocity = pos - prevSeekPos;
+      prevSeekPos = pos;
+      lastVelSample = now;
+      if (velocity == 0) {
+        // Not moving: bump PWM until it breaks free...
+        if (crawlBoost < 60) crawlBoost += 5;
+        // ...but stalled AT max boost means a physical end stop.
+        // Wherever the stop is, it IS the end — accept and finish
+        // instead of grinding the motor into the wall until timeout.
+        else if (++stallCount >= FADER_STALL_SAMPLES) {
+          motorWrite(0);
+          settleUntil = now + FADER_SEEK_SETTLE_MS;
+          seekRetries = FADER_SEEK_MAX_RETRIES;  // no correction pass
+          return;
+        }
+      } else {
+        crawlBoost = 0;
+        stallCount = 0;
+      }
+    }
 
-      // Re-sync state so the motor's own movement doesn't
-      // register as a user touch and echo back to the host
-      lastRawValue = analogRead(analogPin);
-      lastReported = rawToPercent(lastRawValue);
+    // Brake when arrived, when momentum will cross the target this
+    // sample anyway (predictive stop), or on timeout
+    bool arrived  = abs(err) <= FADER_SEEK_DEADBAND;
+    bool crossing = velocity != 0 && ((err > 0) == (velocity > 0))
+                    && abs(err) <= abs(velocity);
+    if (arrived || crossing || now - seekStart > FADER_SEEK_TIMEOUT) {
+      motorWrite(0);  // brake
+      settleUntil = now + FADER_SEEK_SETTLE_MS;
       return;
     }
 
-    // Proportional with a friction floor
-    int speed = err * 6;
-    if (speed > 0) speed = constrain(speed, FADER_SEEK_MIN_SPEED, 255);
-    else speed = constrain(speed, -255, -FADER_SEEK_MIN_SPEED);
-    motorWrite(speed);
+    // Speed profile: full proportional far out, short ramp-down near
+    // the target (predictive brake handles the rest). Correction
+    // passes always creep.
+    int speed;
+    if (seekRetries > 0) {
+      speed = FADER_SEEK_CRAWL + crawlBoost;
+    } else if (abs(err) <= FADER_SEEK_SLOW_ZONE) {
+      speed = map(abs(err), 0, FADER_SEEK_SLOW_ZONE,
+                  FADER_SEEK_CRAWL, FADER_SEEK_MIN_SPEED) + crawlBoost;
+    } else {
+      speed = constrain(abs(err) * 6, FADER_SEEK_MIN_SPEED, 255);
+    }
+    motorWrite(err > 0 ? speed : -speed);
     return;
   }
 
@@ -140,4 +217,14 @@ bool Fader::hasMoved() {
   bool m = moved;
   moved = false;
   return m;
+}
+
+void Fader::setCalibration(int rawMin, int rawMax) {
+  if (rawMax - rawMin < 100) return;  // refuse nonsense ranges
+  calMin = rawMin;
+  calMax = rawMax;
+  // Re-prime so the rescaled position does not fire a touch event
+  lastRawValue = analogRead(analogPin);
+  lastReported = rawToPercent(lastRawValue);
+  moved = false;
 }

@@ -9,6 +9,7 @@ pub struct AudioSession {
     pub is_muted: bool,
     pub process_id: u32,
     pub icon_handle: Option<Arc<iced::widget::image::Handle>>,
+    pub exe_path: Option<String>,
     pub last_local_change: Option<Instant>,
     pub last_external_change: Option<Instant>,
 }
@@ -28,6 +29,7 @@ impl AudioSession {
             is_muted,
             process_id,
             icon_handle: None,
+            exe_path: None,
             last_local_change: None,
             last_external_change: None,
         }

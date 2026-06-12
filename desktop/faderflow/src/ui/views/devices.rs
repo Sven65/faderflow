@@ -211,7 +211,41 @@ fn device_card<'a>(
         })
         .padding([5, 12]);
 
-    card_col = card_col.push(row![Space::new().width(Length::Fill), disconnect_btn]);
+    // ── Footer: calibration / disconnect ────────────────────────────────
+    if let Some((cal_ch, cal_phase)) = dev.cal_state {
+        let instruction = if cal_phase == 0 {
+            format!(
+                "Calibrating Ch {}: pull the fader ALL THE WAY DOWN, then press its knob",
+                cal_ch + 1
+            )
+        } else {
+            format!(
+                "Calibrating Ch {}: push the fader ALL THE WAY UP, then press its knob",
+                cal_ch + 1
+            )
+        };
+        let cancel_btn = button(text("Cancel calibration").size(12))
+            .on_press(Message::DeviceCalibrateCancel(idx))
+            .padding([5, 12]);
+        card_col = card_col.push(
+            row![
+                text(instruction).size(12).color(Color::from_rgb(1.0, 0.8, 0.3)),
+                Space::new().width(Length::Fill),
+                cancel_btn,
+            ]
+                .align_y(Alignment::Center)
+                .spacing(10),
+        );
+    } else {
+        let calibrate_btn = button(text("Calibrate faders").size(12))
+            .on_press(Message::DeviceCalibrate(idx))
+            .padding([5, 12]);
+        card_col = card_col.push(row![
+            Space::new().width(Length::Fill),
+            calibrate_btn,
+            disconnect_btn,
+        ].spacing(8));
+    }
 
     container(card_col)
         .width(Length::Fill)

@@ -59,6 +59,14 @@ public:
   bool receiveIcon(Stream& s);
   void stopFader();
 
+  // ---- Calibration support ----
+  int faderRaw();
+  void setFaderCalibration(int rawMin, int rawMax);
+  void showMessage(const char* l1, const char* l2, const char* l3);
+  void redrawUI();
+  void pollEncoderButton();   // encoder only — no display/fader side effects
+  void flushInputs();         // discard accumulated encoder/fader events
+
 private:
   uint8_t id;
   Display display;

@@ -143,3 +143,29 @@ bool Channel::receiveIcon(Stream& s) {
 void Channel::stopFader() {
   fader.stop();
 }
+
+int Channel::faderRaw() {
+  return fader.readRawAveraged();
+}
+
+void Channel::setFaderCalibration(int rawMin, int rawMax) {
+  fader.setCalibration(rawMin, rawMax);
+}
+
+void Channel::showMessage(const char* l1, const char* l2, const char* l3) {
+  display.drawMessage(l1, l2, l3);
+}
+
+void Channel::redrawUI() {
+  display.drawUI(volume, appName.c_str(), &icon);
+}
+
+void Channel::pollEncoderButton() {
+  encoder.update();
+}
+
+void Channel::flushInputs() {
+  encoder.getDelta();
+  encoder.wasPressed();
+  fader.hasMoved();
+}

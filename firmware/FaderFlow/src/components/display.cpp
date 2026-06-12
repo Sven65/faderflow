@@ -153,3 +153,28 @@ void Display::pushIconPixel(uint16_t color) {
 void Display::endIconStream() {
   tft.endWrite();
 }
+
+void Display::drawMessage(const char* line1, const char* line2, const char* line3) {
+  tft.fillScreen(BG_COLOR);
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  tft.setTextColor(ACCENT_COLOR);
+  tft.setTextSize(3);
+  tft.getTextBounds(line1, 0, 0, &x1, &y1, &w, &h);
+  tft.setCursor((SCREEN_WIDTH - w) / 2, 60);
+  tft.print(line1);
+
+  tft.setTextColor(TEXT_COLOR);
+  tft.setTextSize(2);
+  if (line2) {
+    tft.getTextBounds(line2, 0, 0, &x1, &y1, &w, &h);
+    tft.setCursor((SCREEN_WIDTH - w) / 2, 125);
+    tft.print(line2);
+  }
+  if (line3) {
+    tft.getTextBounds(line3, 0, 0, &x1, &y1, &w, &h);
+    tft.setCursor((SCREEN_WIDTH - w) / 2, 155);
+    tft.print(line3);
+  }
+}

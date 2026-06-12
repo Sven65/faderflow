@@ -47,6 +47,9 @@ public:
     void pushIconPixel(uint16_t color);
     void endIconStream();
 
+    // Full-screen centered message (calibration instructions etc.)
+    void drawMessage(const char* line1, const char* line2, const char* line3);
+
 private:
     Adafruit_ST7789 tft;
     int currentVolume;

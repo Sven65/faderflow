@@ -17,6 +17,12 @@
 
 #define CMD_FADER_UPDATE 0x10
 
+// Calibration. Status phases: 0 = waiting for bottom, 1 = waiting for top,
+// 2 = done & saved to EEPROM, 3 = cancelled
+#define CMD_CALIBRATION_START 0x08   // host -> device
+#define CMD_CALIBRATION_CANCEL 0x09  // host -> device
+#define CMD_CALIBRATION_STATUS 0x11  // device -> host: cmd, channel, phase
+
 
 typedef struct {
     uint8_t cmd;

@@ -259,6 +259,7 @@ impl AudioBackend for WindowsAudioBackend {
                                             process_id,
                                         );
                                         session.icon_handle = icon_handle;
+                                        session.exe_path = exe_path.clone();
                                         sessions.push(session);
                                     }
                                 }

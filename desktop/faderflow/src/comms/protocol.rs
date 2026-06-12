@@ -11,6 +11,12 @@ pub const  CMD_DISPLAY_UPDATE_ICON: u8 = 0x07;
 
 pub const CMD_FADER_UPDATE: u8 = 0x10;
 
+// Calibration. Status phases: 0 = waiting bottom, 1 = waiting top,
+// 2 = done & saved, 3 = cancelled
+pub const CMD_CALIBRATION_START: u8 = 0x08;
+pub const CMD_CALIBRATION_CANCEL: u8 = 0x09;
+pub const CMD_CALIBRATION_STATUS: u8 = 0x11;
+
 pub const MAGIC_STRING: &[u8] = b"FADERFLOW";
 pub const UUID_SIZE: usize = 16;
 
@@ -36,9 +42,9 @@ pub struct FaderMessage {
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct DisplayUpdateAppCommand {
-   pub cmd: u8,        // CMD_SET_APP
-   pub channel: u8,
-   pub name: [u8; 64],
+    pub cmd: u8,        // CMD_SET_APP
+    pub channel: u8,
+    pub name: [u8; 64],
 }
 
 #[repr(C, packed)]
