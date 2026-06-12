@@ -1,6 +1,6 @@
 //
 // Created by Mackan on 2026-06-12.
-// FaderFlow main — 5 channels via Channel API, serial protocol + handshake.
+// FaderFlow main — 5 channels, non-blocking serial parser, icon streaming.
 //
 
 #include "main.h"
@@ -31,6 +31,8 @@ Channel* channels[NUM_CHANNELS];
 
 static bool handshakeComplete = false;
 
+// ---- Outgoing ----
+
 // Protocol speaks 0-255 for fader position; channels speak 0-100
 static uint8_t volumeToProtocol(int volume) {
   return map(volume, 0, 100, 0, 255);
@@ -44,37 +46,60 @@ static void sendFaderUpdate(uint8_t channel, int volume) {
   Serial.write((uint8_t*)&msg, sizeof(msg));
 }
 
-// ---- Incoming command handlers ----
+// ---- Incoming: non-blocking packet assembler ----
+//
+// Bytes are pumped into rxBuf as they arrive; a command is dispatched
+// only once its complete packet is present. A truncated packet just
+// waits in the buffer instead of desyncing the stream via readBytes
+// timeouts. Unknown lead bytes are discarded one at a time (resync).
+//
+// Exception: CMD_DISPLAY_UPDATE_ICON. Its 8192-byte payload doesn't fit
+// any buffer on this chip, so the parser treats the 2-byte header as the
+// packet and the handler streams the payload straight to the display.
 
-static void handleAppNameUpdate() {
-  DisplayUpdateAppCommand cmd;
-  // cmd byte already consumed — read from .channel onward
-  size_t bytesToRead = sizeof(DisplayUpdateAppCommand) - 1;
-  if (Serial.readBytes((uint8_t*)&cmd.channel, bytesToRead) != bytesToRead) {
-    return;
+#define RX_BUF_SIZE 80  // largest buffered packet: DisplayUpdateAppCommand (66 B)
+
+static uint8_t rxBuf[RX_BUF_SIZE];
+static uint8_t rxLen = 0;
+static uint8_t rxExpected = 0;
+
+// Full packet length (incl. cmd byte) for each command. 0 = unknown.
+static uint8_t packetLength(uint8_t cmd) {
+  switch (cmd) {
+    case CMD_HANDSHAKE_REQUEST:
+    case CMD_HANDSHAKE_ACK:
+    case CMD_ECHO_UUID:
+      return 1;
+    case CMD_DISPLAY_UPDATE_APP_NAME:
+      return sizeof(DisplayUpdateAppCommand);
+    case CMD_DISPLAY_UPDATE_APP_VOLUME:
+      return sizeof(DisplayUpdateVolumeCommand);
+    case CMD_DISPLAY_UPDATE_ICON:
+      return 2;  // header only — payload is streamed by the handler
+    default:
+      if (cmd == 'h' || cmd == 'u') return 1;  // debug shortcuts
+      return 0;
   }
-  cmd.name[63] = '\0';  // force null termination
-
-  if (cmd.channel >= NUM_CONNECTED_CHANNELS) return;
-  channels[cmd.channel]->setApp(cmd.name);
 }
 
-static void handleVolumeUpdate() {
-  DisplayUpdateVolumeCommand cmd;
-  size_t bytesToRead = sizeof(DisplayUpdateVolumeCommand) - 1;
-  if (Serial.readBytes((uint8_t*)&cmd.channel, bytesToRead) != bytesToRead) {
-    return;
-  }
+static void handleIconTransfer(uint8_t ch) {
+  // Motors must not run unsupervised during the ~0.75s blocking transfer
+  for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) channels[i]->stopFader();
 
-  if (cmd.channel >= NUM_CONNECTED_CHANNELS) return;
-  // setVolume updates the display AND motor-seeks the fader.
-  // Fader suppresses touch events during the seek, so this
-  // won't echo back to the host as a CMD_FADER_UPDATE.
-  channels[cmd.channel]->setVolume(cmd.volume);
+  if (ch < NUM_CONNECTED_CHANNELS) {
+    channels[ch]->receiveIcon(Serial);
+  } else {
+    // Invalid channel: still consume the payload or the stream desyncs
+    uint16_t remaining = 8192;
+    uint32_t lastByte = millis();
+    while (remaining > 0 && millis() - lastByte < 500) {
+      if (Serial.available()) { Serial.read(); remaining--; lastByte = millis(); }
+    }
+  }
 }
 
-static void handleSerialCommand() {
-  uint8_t cmd = Serial.read();
+static void dispatchPacket() {
+  uint8_t cmd = rxBuf[0];
 
   if (cmd == CMD_HANDSHAKE_REQUEST || cmd == 'h') {
     sendHandshake();
@@ -89,16 +114,52 @@ static void handleSerialCommand() {
     Serial.write(uuid, UUID_SIZE);
   }
   else if (cmd == CMD_DISPLAY_UPDATE_APP_NAME) {
-    handleAppNameUpdate();
+    DisplayUpdateAppCommand c;
+    memcpy(&c, rxBuf, sizeof(c));
+    c.name[63] = '\0';
+    if (c.channel < NUM_CONNECTED_CHANNELS) {
+      channels[c.channel]->setApp(c.name);
+    }
   }
   else if (cmd == CMD_DISPLAY_UPDATE_APP_VOLUME) {
-    handleVolumeUpdate();
+    DisplayUpdateVolumeCommand c;
+    memcpy(&c, rxBuf, sizeof(c));
+    if (c.channel < NUM_CONNECTED_CHANNELS) {
+      // Updates the display AND motor-seeks the fader. The fader
+      // suppresses touch events during the seek, so this won't echo
+      // back to the host as a CMD_FADER_UPDATE.
+      channels[c.channel]->setVolume(c.volume);
+    }
+  }
+  else if (cmd == CMD_DISPLAY_UPDATE_ICON) {
+    handleIconTransfer(rxBuf[1]);
   }
 }
 
+static void pumpSerial() {
+  while (Serial.available() > 0) {
+    uint8_t b = Serial.read();
+
+    if (rxLen == 0) {
+      // Start of a packet: byte must be a known command
+      rxExpected = packetLength(b);
+      if (rxExpected == 0) continue;  // unknown byte — discard, resync
+    }
+
+    rxBuf[rxLen++] = b;
+
+    if (rxLen >= rxExpected) {
+      dispatchPacket();
+      rxLen = 0;
+      rxExpected = 0;
+    }
+  }
+}
+
+// ---- Arduino ----
+
 void setup() {
   Serial.begin(115200);
-  Serial.setTimeout(50);
 
   initDeviceID();
 
@@ -125,6 +186,7 @@ void setup() {
       MOTOR_A[i], MOTOR_B[i], FADER_PIN[i]
     );
     channels[i]->begin();
+    pumpSerial();  // drain anything the host sent during slow display init
   }
 }
 
@@ -137,15 +199,15 @@ void loop() {
     lastBeacon = millis();
   }
 
-  if (Serial.available() > 0) {
-    handleSerialCommand();
-  }
+  pumpSerial();
 
   // Local hardware always runs (encoders, touch detection,
   // motor seeks, display updates)
   for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) {
     Channel* ch = channels[i];
     ch->update();
+
+    pumpSerial();  // drain between channels — display redraws are slow
 
     // ...but only report to the host once the link is up
     if (!handshakeComplete) continue;

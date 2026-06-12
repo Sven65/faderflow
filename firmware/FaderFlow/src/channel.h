@@ -56,6 +56,9 @@ public:
   // Check if button was pressed
   bool wasButtonPressed();
 
+  bool receiveIcon(Stream& s);
+  void stopFader();
+
 private:
   uint8_t id;
   Display display;

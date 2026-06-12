@@ -20,6 +20,8 @@ Channel::Channel(
   encoderChanged = false;
   encoderDelta = 0;
   faderChanged = false;
+  displayDirty = false;
+  lastDisplayDraw = 0;
 }
 
 void Channel::begin() {
@@ -107,4 +109,37 @@ bool Channel::hasFaderChanged() {
 
 bool Channel::wasButtonPressed() {
   return encoder.wasPressed();
+}
+bool Channel::receiveIcon(Stream& s) {
+  display.beginIconStream();
+
+  const uint16_t total = (uint16_t)ICON_SIZE * ICON_SIZE;
+  uint16_t pixelsDone = 0;
+  uint8_t hi = 0;
+  bool haveHigh = false;
+  uint32_t lastByte = millis();
+
+  while (pixelsDone < total) {
+    if (s.available()) {
+      uint8_t b = s.read();
+      lastByte = millis();
+      if (!haveHigh) { hi = b; haveHigh = true; }
+      else {
+        display.pushIconPixel(((uint16_t)hi << 8) | b);
+        haveHigh = false;
+        pixelsDone++;
+      }
+    } else if (millis() - lastByte > 500) {
+      display.endIconStream();
+      return false;  // host died mid-transfer
+    }
+  }
+
+  display.endIconStream();
+  icon.markStreamed();
+  return true;
+}
+
+void Channel::stopFader() {
+  fader.stop();
 }

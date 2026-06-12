@@ -80,3 +80,8 @@ void Icon::clear() {
   usingTestIcon = false;
   pixelIndex = 0;
 }
+
+void Icon::markStreamed() {
+  ready = true;
+  usingTestIcon = false;
+}

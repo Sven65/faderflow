@@ -138,3 +138,18 @@ void Display::drawPlaceholderIcon(int x, int y, int size) {
 Adafruit_ST7789* Display::getTFT() {
   return &tft;
 }
+
+void Display::beginIconStream() {
+  int iconX = (SCREEN_WIDTH - ICON_SIZE) / 2;
+  int iconY = 40;
+  tft.startWrite();
+  tft.setAddrWindow(iconX, iconY, ICON_SIZE, ICON_SIZE);
+}
+
+void Display::pushIconPixel(uint16_t color) {
+  tft.writeColor(color, 1);
+}
+
+void Display::endIconStream() {
+  tft.endWrite();
+}
