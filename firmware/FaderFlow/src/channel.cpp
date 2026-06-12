@@ -1,5 +1,6 @@
 //
 // Created by Mackan on 2026-02-13.
+// Updated 2026-06-12: Fader component integrated.
 //
 
 #include "channel.h"
@@ -7,38 +8,55 @@
 Channel::Channel(
   uint8_t id,
   int8_t displayCS, int8_t displayDC, int8_t displayRST,
-  uint8_t encoderDT, uint8_t encoderCLK, uint8_t encoderSW
+  uint8_t encoderDT, uint8_t encoderCLK, uint8_t encoderSW,
+  uint8_t faderMotorA, uint8_t faderMotorB, uint8_t faderAnalog
 ) : id(id),
     display(displayCS, displayDC, displayRST),
-    encoder(encoderDT, encoderCLK, encoderSW) {
+    encoder(encoderDT, encoderCLK, encoderSW),
+    fader(faderMotorA, faderMotorB, faderAnalog) {
 
   appName = "Waiting...";
   volume = 50;
   encoderChanged = false;
   encoderDelta = 0;
+  faderChanged = false;
 }
 
 void Channel::begin() {
   display.begin();
   encoder.begin();
+  fader.begin();
+
+  // Adopt the fader's physical position as the starting volume
+  volume = fader.getPosition();
+
   display.drawUI(volume, appName.c_str(), &icon);
 }
 
 void Channel::update() {
   encoder.update();
+  fader.update();
 
-  // Check for encoder changes
   int delta = encoder.getDelta();
   if (delta != 0) {
     encoderChanged = true;
-    encoderDelta = delta;
+    encoderDelta += delta;
+    volume = constrain(volume + delta, 0, 100);
+    fader.setTarget(volume);
+    displayDirty = true;          // ← was: display.updateVolume(volume);
+  }
 
-    // Update volume locally
-    volume += delta;
-    volume = constrain(volume, 0, 100);
+  if (fader.hasMoved()) {
+    volume = fader.getPosition();
+    faderChanged = true;
+    displayDirty = true;          // ← was: display.updateVolume(volume);
+  }
 
-    // Update display
+  // Throttled redraw — screen at ~12Hz, everything else at full speed
+  if (displayDirty && millis() - lastDisplayDraw >= 80) {
     display.updateVolume(volume);
+    lastDisplayDraw = millis();
+    displayDirty = false;
   }
 }
 
@@ -50,6 +68,7 @@ void Channel::setApp(const char* appName) {
 void Channel::setVolume(int volume) {
   this->volume = constrain(volume, 0, 100);
   display.updateVolume(this->volume);
+  fader.setTarget(this->volume);
 }
 
 int Channel::getVolume() {
@@ -78,6 +97,12 @@ int Channel::getEncoderDelta() {
   int delta = encoderDelta;
   encoderDelta = 0;
   return delta;
+}
+
+bool Channel::hasFaderChanged() {
+  bool changed = faderChanged;
+  faderChanged = false;
+  return changed;
 }
 
 bool Channel::wasButtonPressed() {

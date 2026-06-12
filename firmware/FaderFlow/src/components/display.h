@@ -43,6 +43,10 @@ public:
     // Get the underlying TFT object if needed
     Adafruit_ST7789* getTFT();
 
+    void beginIconStream();
+    void pushIconPixel(uint16_t color);
+    void endIconStream();
+
 private:
     Adafruit_ST7789 tft;
     int currentVolume;

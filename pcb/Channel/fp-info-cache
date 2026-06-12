@@ -1,4 +1,4 @@
-26488402483110234
+26491945157269880
 113990105
 SEEED_113990105
 
@@ -61263,6 +61263,20 @@ One digit LED 7 segment SA39-11 SC39-11 SA39-12 SC39-12
 0
 10
 10
+Display_SPI_ST7789
+Display_SPI_21.08x73.15mm_8Pin
+
+
+0
+8
+8
+Display_SPI_ST7789
+Display_SPI_32x43.5mm_8Pin
+
+
+0
+8
+8
 EC11
 RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm
 Alps rotary encoder, EC12E... with switch, vertical shaft, http://www.alps.com/prod/info/E/HTML/Encoder/Incremental/EC11/EC11E15204A3.html

@@ -18,6 +18,9 @@ pub struct DeviceInfo {
     pub status: DeviceStatus,
     pub watchdog_cancel: Arc<AtomicBool>,
     pub channel_assignments: [String; 5],
+    pub rx_buf: Vec<u8>,
+    pub channel_volumes: [u8; 5],
+    pub last_fader_rx: [Option<std::time::Instant>; 5],
 }
 
 impl DeviceInfo {

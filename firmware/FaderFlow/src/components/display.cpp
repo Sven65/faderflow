@@ -6,8 +6,9 @@
 #include "../config.h"
 
 Display::Display(int8_t cs, int8_t dc, int8_t rst)
-  : tft(cs, dc, SHARED_MOSI_PIN, SHARED_SCLK_PIN, rst) {
-  currentVolume = 0;
+  //: tft(cs, dc, SHARED_MOSI_PIN, SHARED_SCLK_PIN, rst) {
+  	: tft(cs, dc, rst) {
+	currentVolume = 0;
 }
 
 void Display::begin() {
@@ -53,7 +54,7 @@ void Display::drawUI(int volume, const char* appName, Icon* icon) {
 void Display::updateVolume(int volume) {
   currentVolume = volume;
   // Clear volume area
-  tft.fillRect(0, 140, SCREEN_WIDTH, 100, BG_COLOR);
+  tft.fillRect(0, 145, SCREEN_WIDTH, 42, BG_COLOR);
   drawVolumeDisplay(volume);
 }
 

@@ -1,69 +1,143 @@
+//
+// Created by Mackan on 2026-02-11.
+// Reworked 2026-06-12: class-based, motor control merged in, protocol decoupled.
+//
+
 #include "fader.h"
-#include "../protocol.h"
 
-const uint8_t faderPins[NUM_FADERS] = {
-    FADER_1_PIN,
-    FADER_2_PIN,
-    FADER_3_PIN,
-    FADER_4_PIN,
-    FADER_5_PIN
-};
-
-struct FaderState {
-    int lastRawValue;
-    uint8_t lastSentValue;
-    unsigned long lastReadTime;
-};
-
-static FaderState faderStates[NUM_CONNECTED_FADERS];
-
-void initFaders() {
-    for (int i = 0; i < NUM_CONNECTED_FADERS; i++) {
-        pinMode(faderPins[i], INPUT);
-        faderStates[i].lastRawValue = -1;
-        faderStates[i].lastSentValue = 255;
-        faderStates[i].lastReadTime = 0;
-    }
+Fader::Fader(uint8_t motorA, uint8_t motorB, uint8_t analogPin)
+  : motorA(motorA), motorB(motorB), analogPin(analogPin) {
+  lastRawValue = -1;
+  lastReported = -1;
+  lastReadTime = 0;
+  target = -1;
+  seeking = false;
+  seekStart = 0;
+  moved = false;
 }
 
-void readFaders() {
-    unsigned long now = millis();
+void Fader::begin() {
+  pinMode(analogPin, INPUT);
+  pinMode(motorA, OUTPUT);
+  pinMode(motorB, OUTPUT);
+  motorWrite(0);
 
-    for (uint8_t i = 0; i < NUM_CONNECTED_FADERS; i++) {
-        FaderState* state = &faderStates[i];
+  // Prime the EMA and reported value so we don't fire a
+  // spurious move event on the first update()
+  lastRawValue = analogRead(analogPin);
+  lastReported = rawToPercent(lastRawValue);
+}
 
-        // Rate limit per fader
-        if (now - state->lastReadTime < FADER_READ_INTERVAL) {
-            continue;
-        }
-        state->lastReadTime = now;
+int Fader::rawToPercent(int raw) {
+#if FADER_INVERTED
+  return map(raw, 1023, 0, 0, 100);
+#else
+  return map(raw, 0, 1023, 0, 100);
+#endif
+}
 
-        analogRead(faderPins[i]);
-        delayMicroseconds(100);
-        // Read current position
-        int rawValue = analogRead(faderPins[i]);
+void Fader::motorWrite(int speed) {
+  speed = constrain(speed, -255, 255);
+  if (speed > 0) {
+    analogWrite(motorA, speed);
+    analogWrite(motorB, 0);
+  } else if (speed < 0) {
+    analogWrite(motorA, 0);
+    analogWrite(motorB, -speed);
+  } else {
+    // Brake (both high)
+    analogWrite(motorA, 255);
+    analogWrite(motorB, 255);
+  }
+}
 
-        // Simple moving average for smoothing
-        if (state->lastRawValue == -1) {
-            state->lastRawValue = rawValue;
-        } else {
-            state->lastRawValue = (state->lastRawValue * 3 + rawValue) / 4;
-        }
+int Fader::read() {
+  // ADC mux settle, then average — from the bring-up sketch
+  analogRead(analogPin);
+  delayMicroseconds(100);
+  long sum = 0;
+  for (uint8_t k = 0; k < 8; k++) sum += analogRead(analogPin);
+  return rawToPercent(sum / 8);
+}
 
-        // Map to 0-255
-        uint8_t faderPos = map(state->lastRawValue, 0, 1024, 0, 255);
+void Fader::setTarget(int percent) {
+  percent = constrain(percent, 0, 100);
 
-        // Only send if changed beyond deadband
-        if (abs(faderPos - state->lastSentValue) > FADER_DEADBAND) {
-            state->lastSentValue = faderPos;
+  // Already there? Don't twitch the motor.
+  if (abs(getPosition() - percent) <= FADER_SEEK_DEADBAND) return;
 
-            // Send binary message
-            FaderMessage msg;
-            msg.cmd = CMD_FADER_UPDATE;
-            msg.channel = i;
-            msg.position = faderPos;
+  target = percent;
+  seeking = true;
+  seekStart = millis();
+}
 
-            Serial.write((uint8_t*)&msg, sizeof(msg));
-        }
+bool Fader::isSeeking() {
+  return seeking;
+}
+
+int Fader::getPosition() {
+  if (lastRawValue == -1) return 0;
+  return rawToPercent(lastRawValue);
+}
+
+void Fader::stop() {
+  motorWrite(0);
+  seeking = false;
+  target = -1;
+}
+
+void Fader::update() {
+  unsigned long now = millis();
+
+  if (seeking) {
+    // Seek loop runs unthrottled for responsive control
+    int pos = read();
+    int err = target - pos;
+
+    if (abs(err) <= FADER_SEEK_DEADBAND || now - seekStart > FADER_SEEK_TIMEOUT) {
+      motorWrite(0);  // brake
+      seeking = false;
+      target = -1;
+
+      // Re-sync state so the motor's own movement doesn't
+      // register as a user touch and echo back to the host
+      lastRawValue = analogRead(analogPin);
+      lastReported = rawToPercent(lastRawValue);
+      return;
     }
+
+    // Proportional with a friction floor
+    int speed = err * 6;
+    if (speed > 0) speed = constrain(speed, FADER_SEEK_MIN_SPEED, 255);
+    else speed = constrain(speed, -255, -FADER_SEEK_MIN_SPEED);
+    motorWrite(speed);
+    return;
+  }
+
+  // Idle: rate-limited touch detection
+  if (now - lastReadTime < FADER_READ_INTERVAL) return;
+  lastReadTime = now;
+
+  // Burst average: noise reduction without lag — all samples are "now"
+  analogRead(analogPin);
+  delayMicroseconds(100);
+  long sum = 0;
+  for (uint8_t k = 0; k < 4; k++) sum += analogRead(analogPin);
+  int rawValue = sum / 4;
+
+  if (lastRawValue == -1) lastRawValue = rawValue;
+  else lastRawValue = (lastRawValue + rawValue) / 2;
+
+  int pos = rawToPercent(lastRawValue);
+
+  if (abs(pos - lastReported) > FADER_DEADBAND) {
+    lastReported = pos;
+    moved = true;
+  }
+}
+
+bool Fader::hasMoved() {
+  bool m = moved;
+  moved = false;
+  return m;
 }

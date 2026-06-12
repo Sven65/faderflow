@@ -1,5 +1,6 @@
 //
 // Created by Mackan on 2026-02-13.
+// Updated 2026-06-12: Fader component integrated.
 //
 
 #ifndef FADERFLOW_CHANNEL_H
@@ -8,60 +9,68 @@
 #include <Arduino.h>
 #include "components/display.h"
 #include "components/RotaryEncoder.h"
+#include "components/fader.h"
 #include "components/icon.h"
 
 class Channel {
-  public:
-    // Constructor
-    Channel(
-      uint8_t id,
-      // Display pins
-      int8_t displayCS, int8_t displayDC, int8_t displayRST,
-      // Encoder pins
-      uint8_t encoderDT, uint8_t encoderCLK, uint8_t encoderSW
-      // Fader pins (for later)
-      // uint8_t faderPWM1, uint8_t faderPWM2, uint8_t faderAnalog
-    );
+public:
+  Channel(
+    uint8_t id,
+    // Display pins
+    int8_t displayCS, int8_t displayDC, int8_t displayRST,
+    // Encoder pins
+    uint8_t encoderDT, uint8_t encoderCLK, uint8_t encoderSW,
+    // Fader pins
+    uint8_t faderMotorA, uint8_t faderMotorB, uint8_t faderAnalog
+  );
 
-    // Initialize all components
-    void begin();
+  // Initialize all components
+  void begin();
 
-    // Update all components (call in loop)
-    void update();
+  // Update all components (call in loop)
+  void update();
 
-    // Set the current app
-    void setApp(const char* appName);
+  // Set the current app
+  void setApp(const char* appName);
 
-    // Set the volume
-    void setVolume(int volume);
+  // Set the volume (from host) — updates display AND moves the fader
+  void setVolume(int volume);
 
-    // Get current volume
-    int getVolume();
+  // Get current volume
+  int getVolume();
 
-    // Get channel ID
-    uint8_t getID();
+  // Get channel ID
+  uint8_t getID();
 
-    // Icon management
-    Icon* getIcon();
-    void updateIconDisplay();
+  // Icon management
+  Icon* getIcon();
+  void updateIconDisplay();
 
-    // Check if encoder changed
-    bool hasEncoderChanged();
-    int getEncoderDelta();
+  // Check if encoder changed
+  bool hasEncoderChanged();
+  int getEncoderDelta();
 
-    // Check if button was pressed
-    bool wasButtonPressed();
+  // Check if the user moved the fader
+  bool hasFaderChanged();
 
-  private:
-    uint8_t id;
-    Display display;
-    RotaryEncoder encoder;
-    Icon icon;
+  // Check if button was pressed
+  bool wasButtonPressed();
 
-    String appName;
-    int volume;
-    bool encoderChanged;
-    int encoderDelta;
+private:
+  uint8_t id;
+  Display display;
+  RotaryEncoder encoder;
+  Fader fader;
+  Icon icon;
+
+  String appName;
+  int volume;
+  bool encoderChanged;
+  int encoderDelta;
+  bool faderChanged;
+
+  bool displayDirty;
+  uint32_t lastDisplayDraw;
 };
 
 #endif //FADERFLOW_CHANNEL_H

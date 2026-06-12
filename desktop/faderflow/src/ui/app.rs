@@ -18,6 +18,11 @@ use crate::ui::views;
 use crate::ui::views::no_devices::NoDevicesReason;
 use crate::ui::views::scanning::{LogKind, ScanningState};
 
+use crate::comms::protocol::{
+    FaderMessage, HandshakeResponse,
+    CMD_FADER_UPDATE, CMD_HANDSHAKE_RESPONSE,
+};
+
 // ── App screens ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, PartialEq, Clone)]
@@ -78,7 +83,8 @@ pub enum Message {
     DeviceDisconnect(usize),
     DeviceChannelAssign(usize, usize, String), // device_idx, channel, session_name
     DeviceSync(usize),
-    SelectOutput(String),                      // ← was missing from enum
+    SelectOutput(String),
+    PollSerial,
 }
 
 // ── Constructor ──────────────────────────────────────────────────────────────
@@ -135,6 +141,7 @@ impl VolumeApp {
                         session.volume = volume;
                         session.last_local_change = Some(Instant::now());
                         let _ = self.backend.set_volume(&id, volume);
+                        Self::push_volume_to_devices(&mut s.devices, &id, volume);  // ← ADD
                     }
                 }
                 Task::none()
@@ -208,7 +215,10 @@ impl VolumeApp {
                                 .map(|t| t.elapsed() < Duration::from_millis(50))
                                 .unwrap_or(false);
                             if !ignore {
-                                if let Some(v) = vol  { session.volume   = v; }
+                                if let Some(v) = vol  {
+                                    session.volume = v;
+                                    Self::push_volume_to_devices(&mut s.devices, &id, v);
+                                }
                                 if let Some(m) = mute { session.is_muted = m; }
                                 session.last_external_change = Some(Instant::now());
                             }
@@ -327,6 +337,7 @@ impl VolumeApp {
                 }
                 Task::none()
             }
+
             Message::DeviceSync(dev_idx) => {
                 if let AppScreen::Ready(state) = &mut self.screen {
                     if let Some(dev) = state.devices.get_mut(dev_idx) {
@@ -334,6 +345,7 @@ impl VolumeApp {
                         for (ch, session_name) in dev.channel_assignments.iter().enumerate() {
                             if let Ok(mut p) = port.lock() {
                                 send_app_name(&mut **p, ch as u8, session_name);
+                                std::thread::sleep(Duration::from_millis(60)); // let the redraw finish
                                 let vol = if session_name.is_empty() {
                                     0
                                 } else {
@@ -342,6 +354,8 @@ impl VolumeApp {
                                         .unwrap_or(0)
                                 };
                                 send_volume(&mut **p, ch as u8, vol);
+                                std::thread::sleep(Duration::from_millis(60));
+                                dev.channel_volumes[ch] = vol;
                             }
                         }
                     }
@@ -359,6 +373,63 @@ impl VolumeApp {
                     }
                     if state.devices.is_empty() {
                         self.screen = AppScreen::NoDevices(NoDevicesReason::NoneFound);
+                    }
+                }
+                Task::none()
+            }
+            Message::PollSerial => {
+                let mut volume_writes: Vec<(String, f32)> = vec![];
+
+                if let AppScreen::Ready(state) = &mut self.screen {
+                    for dev in state.devices.iter_mut() {
+                        let chunk = {
+                            let Ok(mut p) = dev.port.lock() else { continue };
+                            let avail = p.bytes_to_read().unwrap_or(0) as usize;
+                            if avail == 0 { continue; }
+                            let mut buf = vec![0u8; avail];
+                            match p.read(&mut buf) {
+                                Ok(n) => { buf.truncate(n); buf }
+                                Err(_) => continue,
+                            }
+                        };
+                        dev.rx_buf.extend_from_slice(&chunk);
+
+                        loop {
+                            let Some(&cmd) = dev.rx_buf.first() else { break };
+                            let len = match cmd {
+                                CMD_FADER_UPDATE => std::mem::size_of::<FaderMessage>(),
+                                // stray beacon between REQUEST and ACK — skip whole
+                                CMD_HANDSHAKE_RESPONSE => std::mem::size_of::<HandshakeResponse>(),
+                                _ => { dev.rx_buf.remove(0); continue } // resync
+                            };
+                            if dev.rx_buf.len() < len { break; }
+
+                            if cmd == CMD_FADER_UPDATE {
+                                let msg: FaderMessage = unsafe {
+                                    std::ptr::read(dev.rx_buf.as_ptr() as *const _)
+                                };
+                                let ch = msg.channel as usize;
+                                if ch < 5 {
+                                    dev.channel_volumes[ch] = msg.position_percent();
+                                    dev.last_fader_rx[ch] = Some(Instant::now());
+                                    let session = &dev.channel_assignments[ch];
+                                    if !session.is_empty() {
+                                        volume_writes.push((
+                                            session.clone(),
+                                            msg.position_percent() as f32 / 100.0,
+                                        ));
+                                    }
+                                }
+                            }
+                            dev.rx_buf.drain(..len);
+                        }
+                    }
+
+                    for (session, vol) in volume_writes {
+                        let _ = self.backend.set_volume(&session, vol);
+                        if let Some(s) = state.sessions.get_mut(&session) {
+                            s.volume = vol;
+                        }
                     }
                 }
                 Task::none()
@@ -429,6 +500,9 @@ impl VolumeApp {
                             status: DeviceStatus::Connected,
                             watchdog_cancel,
                             channel_assignments,
+                            rx_buf: Vec::new(),
+                            channel_volumes: [255; 5],
+                            last_fader_rx: [None; 5],
                         }
                     })
                     .collect();
@@ -572,6 +646,10 @@ impl VolumeApp {
                     iced::time::every(Duration::from_millis(500))
                         .map(|_| Message::WatchdogTick),
                 );
+                subs.push(
+                    iced::time::every(Duration::from_millis(30))
+                        .map(|_| Message::PollSerial),
+                );
             }
             AppScreen::NoDevices(NoDevicesReason::Lost { .. }) => {
                 subs.push(
@@ -583,5 +661,25 @@ impl VolumeApp {
         }
 
         Subscription::batch(subs)
+    }
+
+    fn push_volume_to_devices(devices: &mut [DeviceInfo], session_id: &str, volume: f32) {
+        let pct = (volume * 100.0).round().clamp(0.0, 100.0) as u8;
+        for dev in devices.iter_mut() {
+            for ch in 0..5 {
+                if dev.channel_assignments[ch] != session_id { continue; }
+                // Touch hold-off: hand is on the fader — it's the source of truth
+                if dev.last_fader_rx[ch]
+                    .map(|t| t.elapsed() < Duration::from_millis(300))
+                    .unwrap_or(false) { continue; }
+                // Echo/dedupe guard: device already shows this value
+                if dev.channel_volumes[ch] != 255
+                    && dev.channel_volumes[ch].abs_diff(pct) <= 1 { continue; }
+                if let Ok(mut p) = dev.port.lock() {
+                    send_volume(&mut **p, ch as u8, pct);
+                    dev.channel_volumes[ch] = pct;
+                }
+            }
+        }
     }
 }
