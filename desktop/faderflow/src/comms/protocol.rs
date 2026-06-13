@@ -16,6 +16,7 @@ pub const CMD_FADER_UPDATE: u8 = 0x10;
 pub const CMD_CALIBRATION_START: u8 = 0x08;
 pub const CMD_CALIBRATION_CANCEL: u8 = 0x09;
 pub const CMD_CALIBRATION_STATUS: u8 = 0x11;
+pub const CMD_CALIBRATION_DEBUG: u8 = 0x12;
 
 pub const MAGIC_STRING: &[u8] = b"FADERFLOW";
 pub const UUID_SIZE: usize = 16;

@@ -13,6 +13,7 @@
 #define FADER_INVERTED 1          // wiper reads 1023 at bottom (confirmed in bring-up)
 #define FADER_RAW_MIN 12          // raw ADC at one physical end stop (pot dead zone)
 #define FADER_RAW_MAX 1011        // raw ADC at the other end stop
+#define FADER_END_MARGIN 15       // raw counts pulled inside each stop so 0% and 100% are reachable
 
 #define FADER_SEEK_DEADBAND 2     // ±% considered "arrived"
 #define FADER_SEEK_MIN_SPEED 110  // PWM floor to overcome static friction
@@ -49,6 +50,11 @@ public:
     bool hasMoved();
 
     void stop();
+
+    // Coast: both motor inputs LOW (outputs Hi-Z). The fader moves
+    // freely by hand with no electrical brake drag. Use during
+    // calibration capture and on cal exit.
+    void release();
 
     // Per-unit calibration: raw ADC values at the physical end stops.
     // Overrides the FADER_RAW_MIN/MAX compile-time defaults.

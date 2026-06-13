@@ -22,7 +22,7 @@ use crate::ui::views::scanning::{LogKind, ScanningState};
 use crate::comms::protocol::{
     FaderMessage, HandshakeResponse,
     CMD_FADER_UPDATE, CMD_HANDSHAKE_RESPONSE,
-    CMD_CALIBRATION_STATUS,
+    CMD_CALIBRATION_STATUS, CMD_CALIBRATION_DEBUG,
 };
 
 // ── App screens ──────────────────────────────────────────────────────────────
@@ -454,6 +454,7 @@ impl VolumeApp {
                             let len = match cmd {
                                 CMD_FADER_UPDATE => std::mem::size_of::<FaderMessage>(),
                                 CMD_CALIBRATION_STATUS => 3,
+                                CMD_CALIBRATION_DEBUG => 7,
                                 // stray beacon between REQUEST and ACK — skip whole
                                 CMD_HANDSHAKE_RESPONSE => std::mem::size_of::<HandshakeResponse>(),
                                 _ => { dev.rx_buf.remove(0); continue } // resync
@@ -487,6 +488,22 @@ impl VolumeApp {
                                 } else {
                                     dev.cal_state = Some((ch, phase));
                                 }
+                            }
+                            else if cmd == CMD_CALIBRATION_DEBUG {
+                                let ch = dev.rx_buf[1];
+                                let kind = dev.rx_buf[2];
+                                let v1 = u16::from_le_bytes([dev.rx_buf[3], dev.rx_buf[4]]);
+                                let v2 = u16::from_le_bytes([dev.rx_buf[5], dev.rx_buf[6]]);
+                                let line = match kind {
+                                    0 => format!("ch{ch} bottom raw={v1}"),
+                                    1 => format!("ch{ch} ACCEPT  min={v1} max={v2} travel={}", v2.saturating_sub(v1)),
+                                    2 => format!("ch{ch} REJECT  travel={v1} (<=200, kept old)"),
+                                    _ => format!("ch{ch} ? kind={kind} {v1} {v2}"),
+                                };
+                                dev.cal_debug.push(line);
+                                // keep one full 5-channel pass visible
+                                let overflow = dev.cal_debug.len().saturating_sub(12);
+                                if overflow > 0 { dev.cal_debug.drain(..overflow); }
                             }
                             dev.rx_buf.drain(..len);
                         }
@@ -577,6 +594,7 @@ impl VolumeApp {
                             channel_volumes: [255; 5],
                             last_fader_rx: [None; 5],
                             cal_state: None,
+                            cal_debug: Vec::new(),
                         }
                     })
                     .collect();

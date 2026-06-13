@@ -144,6 +144,10 @@ void Channel::stopFader() {
   fader.stop();
 }
 
+void Channel::releaseFader() {
+  fader.release();
+}
+
 int Channel::faderRaw() {
   return fader.readRawAveraged();
 }

@@ -62,10 +62,24 @@ static uint8_t calChannel = 0;
 static uint8_t calPhase = 0;  // 0 = waiting bottom, 1 = waiting top
 static uint16_t calMinArr[NUM_CHANNELS];
 static uint16_t calMaxArr[NUM_CHANNELS];
+static uint16_t calBottomRaw = 0;            // bottom capture, echoed on the TOP prompt
+static char     calMsg[NUM_CHANNELS][22];    // per-channel result, shown on the Done screen
 
 static void sendCalStatus(uint8_t channel, uint8_t phase) {
   uint8_t msg[3] = { CMD_CALIBRATION_STATUS, channel, phase };
   Serial.write(msg, 3);
+}
+
+// Raw calibration values for the host's debug panel.
+// kind 0 = bottom captured (v1=bottom raw); kind 1 = accepted (v1=min, v2=max);
+// kind 2 = rejected (v1=travel). u16 sent little-endian.
+static void sendCalDebug(uint8_t channel, uint8_t kind, uint16_t v1, uint16_t v2) {
+  uint8_t msg[7] = {
+    CMD_CALIBRATION_DEBUG, channel, kind,
+    (uint8_t)(v1 & 0xFF), (uint8_t)(v1 >> 8),
+    (uint8_t)(v2 & 0xFF), (uint8_t)(v2 >> 8)
+  };
+  Serial.write(msg, 7);
 }
 
 static void saveCalibration() {
@@ -99,18 +113,26 @@ static void loadCalibration() {
 static void showCalScreen(uint8_t i) {
   if (i >= NUM_CONNECTED_CHANNELS) return;
   if (i < calChannel) {
-    channels[i]->showMessage("CALIBRATE", "Done!", nullptr);
+    // Already calibrated: show this channel's captured result on screen
+    channels[i]->showMessage("CALIBRATE", "Done!", calMsg[i]);
   } else if (i == calChannel) {
-    channels[i]->showMessage("CALIBRATE",
-      calPhase == 0 ? "Fader to BOTTOM" : "Fader to TOP",
-      "then press knob");
+    if (calPhase == 0) {
+      channels[i]->showMessage("CALIBRATE", "Fader to BOTTOM", "then press knob");
+    } else {
+      // Phase 1: echo the bottom value just captured so it can be eyeballed
+      char l3[22];
+      snprintf(l3, sizeof(l3), "btm=%u, press", (unsigned)calBottomRaw);
+      channels[i]->showMessage("CALIBRATE", "Fader to TOP", l3);
+    }
   } else {
     channels[i]->showMessage("CALIBRATE", "Waiting...", nullptr);
   }
 }
 
 static void startCalibration() {
-  for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) channels[i]->stopFader();
+  // Coast, not brake -- the user must hand-position each fader against the
+  // physical stops, and an electrical brake makes that stiff and unstable.
+  for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) channels[i]->releaseFader();
   calMode = true;
   calChannel = 0;
   calPhase = 0;
@@ -121,7 +143,8 @@ static void startCalibration() {
 static void exitCalibration(uint8_t statusPhase) {
   calMode = false;
   for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) {
-    channels[i]->flushInputs();  // discard knob twiddling during cal
+    channels[i]->flushInputs();   // discard knob twiddling during cal
+    channels[i]->releaseFader();  // coast so faders stay hand-movable until host re-seeks
     channels[i]->redrawUI();
   }
   sendCalStatus(0, statusPhase);  // host re-syncs names/icons/volumes
@@ -134,8 +157,6 @@ static void cancelCalibration() {
 }
 
 static void runCalibration() {
-  static uint16_t bottomRaw = 0;
-
   for (uint8_t i = 0; i < NUM_CONNECTED_CHANNELS; i++) {
     channels[i]->pollEncoderButton();
   }
@@ -149,21 +170,28 @@ static void runCalibration() {
   if (!pressed) return;
 
   if (calPhase == 0) {
-    bottomRaw = channels[calChannel]->faderRaw();
+    calBottomRaw = channels[calChannel]->faderRaw();
+    sendCalDebug(calChannel, 0, calBottomRaw, 0);
     calPhase = 1;
     showCalScreen(calChannel);
     sendCalStatus(calChannel, 1);
   } else {
     uint16_t topRaw = channels[calChannel]->faderRaw();
-    uint16_t mn = min(bottomRaw, topRaw);
-    uint16_t mx = max(bottomRaw, topRaw);
-    if (mx - mn > 200) {  // sanity: the fader actually traveled
+    uint16_t mn = min(calBottomRaw, topRaw);
+    uint16_t mx = max(calBottomRaw, topRaw);
+    uint16_t travel = mx - mn;
+    uint8_t done = calChannel;
+    if (travel > 200) {  // sanity: the fader actually traveled
       calMinArr[calChannel] = mn;
       calMaxArr[calChannel] = mx;
       channels[calChannel]->setFaderCalibration(mn, mx);
+      snprintf(calMsg[done], sizeof(calMsg[done]), "%u-%u OK", (unsigned)mn, (unsigned)mx);
+      sendCalDebug(done, 1, mn, mx);
+    } else {
+      snprintf(calMsg[done], sizeof(calMsg[done]), "t=%u REJECT", (unsigned)travel);
+      sendCalDebug(done, 2, travel, 0);
     }
     calPhase = 0;
-    uint8_t done = calChannel;
     calChannel++;
     showCalScreen(done);  // now shows Done!
     if (calChannel >= NUM_CONNECTED_CHANNELS) {

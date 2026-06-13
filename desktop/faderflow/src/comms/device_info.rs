@@ -22,6 +22,7 @@ pub struct DeviceInfo {
     pub channel_volumes: [u8; 5],
     pub last_fader_rx: [Option<std::time::Instant>; 5],
     pub cal_state: Option<(u8, u8)>,  // (channel, phase) while calibrating
+    pub cal_debug: Vec<String>,       // recent calibration capture log lines
 }
 
 impl DeviceInfo {

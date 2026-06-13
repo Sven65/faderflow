@@ -22,6 +22,7 @@
 #define CMD_CALIBRATION_START 0x08   // host -> device
 #define CMD_CALIBRATION_CANCEL 0x09  // host -> device
 #define CMD_CALIBRATION_STATUS 0x11  // device -> host: cmd, channel, phase
+#define CMD_CALIBRATION_DEBUG 0x12   // device -> host: cmd, channel, kind, v1lo, v1hi, v2lo, v2hi
 
 
 typedef struct {

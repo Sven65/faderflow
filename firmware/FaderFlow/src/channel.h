@@ -58,6 +58,7 @@ public:
 
   bool receiveIcon(Stream& s);
   void stopFader();
+  void releaseFader();  // coast (free) instead of brake
 
   // ---- Calibration support ----
   int faderRaw();

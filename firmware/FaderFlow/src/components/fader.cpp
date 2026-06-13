@@ -39,12 +39,18 @@ void Fader::begin() {
 
 int Fader::rawToPercent(int raw) {
   // Pots never reach the rails at their physical stops — map the
-  // calibrated usable range so 0% and 100% are reachable positions
-  raw = constrain(raw, calMin, calMax);
+  // calibrated usable range so 0% and 100% are reachable positions.
+  // FADER_END_MARGIN pulls each endpoint a few counts inside the captured
+  // stop: press-time capture is a firmer push than normal use, so a typical
+  // hand-push lands a few counts short and would read 1%/99% without it.
+  int lo = calMin + FADER_END_MARGIN;   // toward the 100% stop
+  int hi = calMax - FADER_END_MARGIN;   // toward the 0% stop
+  if (hi <= lo) { lo = calMin; hi = calMax; }  // range too small for margin
+  raw = constrain(raw, lo, hi);
 #if FADER_INVERTED
-  return map(raw, calMax, calMin, 0, 100);
+  return map(raw, hi, lo, 0, 100);
 #else
-  return map(raw, calMin, calMax, 0, 100);
+  return map(raw, lo, hi, 0, 100);
 #endif
 }
 
@@ -105,6 +111,17 @@ int Fader::getPosition() {
 
 void Fader::stop() {
   motorWrite(0);
+  seeking = false;
+  target = -1;
+  settleUntil = 0;
+}
+
+void Fader::release() {
+  // Coast (both inputs LOW) instead of brake (both HIGH). motorWrite(0)
+  // brakes -- correct for crisply ending a seek, wrong for letting the
+  // user hand-position the fader, which is exactly what calibration needs.
+  analogWrite(motorA, 0);
+  analogWrite(motorB, 0);
   seeking = false;
   target = -1;
   settleUntil = 0;
